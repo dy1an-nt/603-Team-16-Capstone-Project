@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resume Reviewer</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>Resume Reviewer</h1>
+    <p id="api-status" class="muted">Checking API...</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>1. Upload resume</h2>
+      <input type="file" id="resume-file" accept=".pdf,.docx">
+    </section>
+
+    <section class="card">
+      <h2>2. Job description</h2>
+      <textarea id="job-text" rows="8" placeholder="Paste the job description"></textarea>
+    </section>
+
+    <button id="analyze-btn" type="button">Analyze</button>
+
+    <section class="card" id="results" hidden>
+      <h2>Results</h2>
+      <div id="results-body"></div>
+    </section>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
