@@ -57,8 +57,9 @@ While working:
 
 - One task, one branch, one pull request. Do not mix unrelated changes into
   a branch because it is already open.
-- Never commit to `main`, push to `main`, merge a pull request, or delete a
-  branch you did not create in this session.
+- Never commit to `main`, push to `main`, or merge a pull request.
+- Never delete a branch, local or remote, including after its pull request
+  merges. The team keeps merged branches.
 - Never force push, `git reset --hard`, or rebase a branch that has been
   pushed, unless the human asked for that exact command. Teammates may have
   pulled it.
