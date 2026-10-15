@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://resume:resume@localhost:5432/resume_reviewer"
 
     secret_key: str = "dev-only-change-me"
-    session_max_age_seconds: int = 86400
+    access_token_expire_minutes: int = 60
 
     frontend_origin: str = "http://localhost:5500"
     max_upload_mb: int = 5
