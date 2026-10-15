@@ -35,7 +35,7 @@ Reference the requirement when it helps: `Add grounding check (FR-18)`.
 2. Fill in the PR template.
 3. CI (lint + tests) must pass.
 4. At least one teammate reviews and approves.
-5. Squash and merge, then delete the branch.
+5. Squash and merge. Keep the branch after it merges; do not delete it.
 
 Keep PRs small. One feature or fix per PR is easier to review than a week of work at once.
 
