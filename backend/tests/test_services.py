@@ -82,3 +82,32 @@ def test_grounding_ignores_bullet_marker_before_first_word():
     out = grounding.flag(s, RESUME, ["Python", "PostgreSQL"])
     assert not out.flagged
     assert out.accepted is None
+
+
+def test_grounding_flags_new_name_at_bullet_start():
+    s = SuggestionDraft(
+        section="experience",
+        original="- Built REST APIs in Python and PostgreSQL",
+        revised="- Kubernetes clusters managed for 3 teams",
+        reason="test",
+    )
+    out = grounding.flag(s, RESUME, ["Python"])
+    assert "new name: Kubernetes" in out.flag_reasons
+
+
+def test_grounding_skips_action_verb_at_bullet_start():
+    s = SuggestionDraft(
+        section="experience",
+        original="- Built REST APIs in Python and PostgreSQL",
+        revised="- Led REST API work in Python and PostgreSQL",
+        reason="test",
+    )
+    out = grounding.flag(s, RESUME, ["Python", "PostgreSQL"])
+    assert not out.flagged
+
+
+def test_grounding_empty_revision_is_not_flagged():
+    s = SuggestionDraft(section="experience", original="Built REST APIs", revised="", reason="test")
+    out = grounding.flag(s, RESUME, ["Python"])
+    assert not out.flagged
+    assert out.flag_reasons == []
