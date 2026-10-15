@@ -110,6 +110,45 @@ ruff check .
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for branching, commits, and pull requests.
 
+Short version: nobody, human or AI, commits to `main`. Every task gets its own branch off the latest `main` and lands through a reviewed pull request.
+
+```bash
+git fetch origin
+git switch -c feature/your-task origin/main
+```
+
+## Working with AI agents
+
+The team uses two coding agents. Both follow the same rules.
+
+| Tool | Model | Reads |
+| --- | --- | --- |
+| Claude Code | Opus 5.5 | [CLAUDE.md](CLAUDE.md), which imports [AGENTS.md](AGENTS.md) |
+| ChatGPT Codex | Sol | [AGENTS.md](AGENTS.md) |
+
+[AGENTS.md](AGENTS.md) is the single rulebook. Change shared rules there, never in `CLAUDE.md`, so the two tools cannot drift apart. Changes to it go through a pull request like any other file.
+
+What the agents are told to do:
+
+- **Check the branch first.** If a session starts on `main`, the agent creates a feature branch before editing anything.
+- **Stay on their own branch.** No commits or pushes to `main`, no merging, no force pushes, and no touching a teammate's branch or uncommitted work without asking.
+- **Open their own PRs.** When a task is done and checks pass, the agent commits, pushes its feature branch, and opens a PR into `main` with the template filled in. A teammate reviews and merges. Agents never merge.
+- **Keep diffs small.** One task per branch. Unrelated bugs get reported, not quietly fixed in the same PR.
+- **Prove it works.** `ruff check .` and `pytest` pass, the changed flow is actually run, and the report says which checks ran and which could not.
+- **Flag team decisions.** Schema changes, new dependencies, API shape changes, and scoring weights need a human OK.
+
+Tips for teammates:
+
+- Start each agent session by naming the task and its requirement IDs, e.g. "Build the ATS rule scorer, FR-9 and FR-10."
+- Running two agents at once? Give each its own worktree so they don't overwrite each other:
+
+  ```bash
+  git worktree add ../rr-ats-scorer -b feature/ats-scorer origin/main
+  ```
+
+- Read your agent's PR before you ask a teammate to review it. You own every line in it, including the ones the agent wrote.
+- When an agent hits a non-obvious pitfall, add one line to the Sharp edges section of `AGENTS.md` so the next session avoids it.
+
 ## Milestones
 
 | Week | Dates (2026) | Milestone |
