@@ -251,9 +251,9 @@ No training data is needed. For testing and evaluation:
 
 A three-tier web app: a static HTML/CSS/JS frontend calls a FastAPI backend over REST, which stores data in PostgreSQL and calls Groq only for job description extraction and revision.
 
-&#91;embedded content: system architecture · 3 tiers, 6 backend modules\]
+_The architecture diagram (3 tiers, 6 backend modules) is in the original report linked from `docs/README.md`._
 
-Parsing, ATS scoring, and match scoring run locally, so scores still work if the LLM is unavailable (NFR-4).
+Parsing, ATS scoring, and match scoring run locally. Parsing and the ATS score still work if the LLM is unavailable (NFR-4). The match score needs job description extraction, so that request fails with an error and a retry option (see `docs/api-contract.md`).
 
 ### Data model
 

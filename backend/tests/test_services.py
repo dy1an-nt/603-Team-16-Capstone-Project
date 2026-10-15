@@ -1,4 +1,4 @@
-from app.schemas import JobRequirements, Suggestion
+from app.schemas import JobRequirements, Suggestion, SuggestionDraft
 from app.services import ats_scorer, grounding, match_scorer, parser
 
 RESUME = """Jane Doe
@@ -70,3 +70,15 @@ def test_grounding_passes_faithful_rewrite():
     )
     out = grounding.flag(s, RESUME, ["Python", "PostgreSQL"])
     assert not out.flagged
+
+
+def test_grounding_ignores_bullet_marker_before_first_word():
+    s = SuggestionDraft(
+        section="experience",
+        original="- Built REST APIs in Python and PostgreSQL",
+        revised="- Designed, built, and tested REST APIs using Python and PostgreSQL",
+        reason="test",
+    )
+    out = grounding.flag(s, RESUME, ["Python", "PostgreSQL"])
+    assert not out.flagged
+    assert out.accepted is None

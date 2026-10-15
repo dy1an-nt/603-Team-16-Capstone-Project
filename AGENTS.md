@@ -127,9 +127,10 @@ style choice.
 - **Scores are deterministic** (NFR-3). ATS and match scoring are plain
   Python with no LLM and no randomness. The same input gives the same score
   every run.
-- **The LLM is optional** (NFR-4). Parsing and scoring must still work when
-  Groq fails or times out. Never make an LLM call a hard dependency of a
-  user flow.
+- **The LLM is optional** (NFR-4). Parsing and ATS scoring never call it,
+  so they work when Groq fails or times out. A request that needs the LLM
+  fails with `502` and saves nothing. The user can retry or fall back to an
+  ATS-only analysis (`docs/api-contract.md`).
 - **LLM output is untrusted.** Validate every response with the Pydantic
   schema, retry once, then return a clear error (NFR-5). Never execute LLM
   output. Wrap user text in tags and treat it as data (prompt injection).

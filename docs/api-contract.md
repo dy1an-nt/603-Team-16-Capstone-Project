@@ -5,8 +5,9 @@ the same time. It covers every endpoint in report section 8
 ([design-report.md](design-report.md)). The Pydantic models in
 `backend/app/schemas.py` are the source of truth for field names and types.
 This page adds one example per endpoint and the rules that apply to all of
-them. Example values are illustrative. With the backend running, `http://localhost:8000/docs` shows the same
-models.
+them. Example values are illustrative, and examples leave out the
+`Authorization` header. With the backend running, `http://localhost:8000/docs`
+shows the same models.
 
 Change this contract only with the team's agreement (`AGENTS.md` section 10).
 Update `schemas.py` and this page in the same pull request.
@@ -15,11 +16,18 @@ Update `schemas.py` and this page in the same pull request.
 
 ### Auth
 
-- Login sets an HTTP-only session cookie. The browser sends it back on every
-  request. `frontend/js/api.js` already uses `credentials: "include"`. The
-  frontend never reads or stores the cookie itself.
+- Login returns a short-lived JWT (NFR-8). The frontend sends it on every
+  other request as `Authorization: Bearer <access_token>`.
+  `frontend/js/api.js` stores it in `sessionStorage` and adds the header.
+- The token expires after `access_token_expire_minutes` from
+  `backend/app/config.py`. There is no refresh token. When it expires, the
+  user logs in again.
 - Every endpoint except `POST /auth/register` and `POST /auth/login` requires
-  the cookie (NFR-8). No cookie, or an expired one, returns `401`.
+  the token. A missing, invalid, or expired token returns `401` with a
+  `WWW-Authenticate: Bearer` header. `api.js` drops the stored token on any
+  `401`.
+- A token in `sessionStorage` can be read by any script on the page, so the
+  frontend renders user and LLM text with `textContent`, never `innerHTML`.
 - A resume, analysis, or revision that belongs to another user returns `404`,
   the same as one that does not exist (NFR-9). Never `403`, which would
   confirm the record exists.
@@ -56,13 +64,13 @@ The frontend should show `detail` when it is a string and the first item's
 | Status | When |
 | --- | --- |
 | 400 | Request is well formed but cannot be processed (for example, a parsed resume with no text) |
-| 401 | Not logged in, or wrong email or password at login |
+| 401 | Missing, invalid, or expired token, or wrong email or password at login |
 | 404 | Record does not exist or belongs to another user |
 | 409 | Email already registered |
 | 413 | Upload larger than 5 MB |
 | 415 | Upload is not a PDF or DOCX |
 | 422 | Request body or query failed validation |
-| 502 | The LLM failed or returned invalid output twice (NFR-5). Only the revision endpoint returns this. |
+| 502 | The LLM failed or returned invalid output after one retry (NFR-5). Returned by `POST /analyses` with a job description and by `POST /analyses/{id}/revisions`. Nothing is saved. |
 
 ### Conventions
 
@@ -94,7 +102,7 @@ Errors: `409` email taken, `422` invalid email or password under 8 characters.
 
 ### POST /auth/login (FR-2)
 
-No auth. Sets the session cookie.
+No auth. Returns the JWT.
 
 ```http
 POST /auth/login
@@ -103,18 +111,22 @@ Content-Type: application/json
 { "email": "sam@example.com", "password": "correct-horse" }
 ```
 
-`200 OK`, with a `Set-Cookie` header
+`200 OK`
 
 ```json
-{ "id": 7, "email": "sam@example.com", "created_at": "2026-10-14T18:02:11Z" }
+{ "access_token": "eyJhbGciOiJIUzI1NiIs...", "token_type": "bearer", "expires_in": 3600 }
 ```
+
+`expires_in` is in seconds.
 
 Errors: `401` with `{"detail": "Invalid email or password"}`. The message is
 the same whether the email or the password was wrong.
 
 ### POST /auth/logout (FR-2)
 
-Clears the session cookie.
+JWTs are stateless, so the server keeps no session to end. The endpoint
+exists so the frontend has one logout call. The frontend discards its token
+whatever the response.
 
 ```http
 POST /auth/logout
@@ -125,7 +137,7 @@ POST /auth/logout
 ### DELETE /account (FR-3)
 
 Deletes the user and, by cascade, every resume, job description, analysis,
-and revision they own (NFR-14). Clears the session cookie.
+and revision they own (NFR-14). The frontend then discards its token.
 
 ```http
 DELETE /account
@@ -258,15 +270,16 @@ Content-Type: application/json
 
 `keywords` covers required and preferred skills together.
 
-The LLM is optional (NFR-4). If job description extraction fails, the
-analysis is still created with `201`. `ats_score` and `issues` are filled in,
-`job_description_id` is set, and `job_requirements`, `match_score`, and
-`keywords` are `null`. The frontend shows the ATS result and a message that
-the match score is unavailable. An ATS-only analysis has all four of those
-fields `null`.
+An ATS-only analysis has `job_description_id`, `job_requirements`,
+`match_score`, and `keywords` all `null`. It never calls the LLM.
 
-Errors: `404` resume not found, `422` missing `resume_id` or a blank
-`job_description`.
+If job description extraction fails after one retry, the request fails with
+`502` and nothing is saved, not even the ATS score. The frontend offers two
+ways on (NFR-4): retry, or run an ATS-only analysis by sending the same
+request without `job_description`.
+
+Errors: `502` LLM extraction failed, `404` resume not found, `422` missing
+`resume_id` or a blank `job_description`.
 
 ### GET /analyses/{id} (FR-20)
 
@@ -399,8 +412,11 @@ Errors: `404`, `422` any other `fmt`.
 Picked where the report left a choice open. Raise any of these with the team
 before building on a different reading.
 
-- Auth uses a session cookie, not a JWT (report section 7 allows either).
-  `itsdangerous` is already in `requirements.txt` for signing it.
+- Auth uses a JWT in the `Authorization` header, not a cookie (NFR-8 allows
+  either). The report deploys the frontend and backend as separate Cloud Run
+  services, and a header avoids cross-site cookie rules. Signing tokens needs
+  a JWT library that is not in `requirements.txt` yet. The backend owner adds
+  it with the auth work.
 - Register does not log the user in. The frontend calls login next.
 - Job descriptions are pasted text only. FR-11 also mentions upload. That
   can be added later as a separate field without breaking this shape.

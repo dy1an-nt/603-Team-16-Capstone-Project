@@ -21,6 +21,13 @@ class UserOut(BaseModel):
     created_at: datetime
 
 
+class TokenOut(BaseModel):
+    # Sent back as `Authorization: Bearer <access_token>` (NFR-8).
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: int  # seconds
+
+
 # ---------- Resumes (FR-4 to FR-8, FR-20) ----------
 class ResumeSummary(BaseModel):
     id: int
@@ -71,8 +78,8 @@ class AnalysisOut(BaseModel):
     job_description_id: int | None
     ats_score: int = Field(ge=0, le=100)
     issues: list[AtsIssue]
-    # The three fields below are null when no job description was sent, or when
-    # LLM extraction failed (NFR-4). The ATS score is always present.
+    # The three fields below are null only for an ATS-only analysis. If LLM
+    # extraction fails, the request fails with 502 and nothing is saved.
     job_requirements: JobRequirements | None
     match_score: int | None = Field(ge=0, le=100)
     keywords: KeywordReport | None
@@ -80,19 +87,25 @@ class AnalysisOut(BaseModel):
 
 
 # ---------- LLM output: revision suggestions (FR-14, FR-15) ----------
-class Suggestion(BaseModel):
+class SuggestionDraft(BaseModel):
+    # Only the fields the LLM may set. Extra keys such as "flagged" or
+    # "accepted" in its output are dropped during validation.
     section: str
     original: str
     revised: str
     reason: str
     keywords_added: list[str] = []
-    flagged: bool = False
-    flag_reasons: list[str] = []
-    accepted: bool | None = None
 
 
 class SuggestionList(BaseModel):
-    suggestions: list[Suggestion]
+    suggestions: list[SuggestionDraft]
+
+
+class Suggestion(SuggestionDraft):
+    # Set by services.grounding (FR-18) and the user (FR-16), never by the LLM.
+    flagged: bool = False
+    flag_reasons: list[str] = []
+    accepted: bool | None = None
 
 
 # ---------- Revisions (FR-14 to FR-19) ----------

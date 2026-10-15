@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, status
 
-from app.schemas import Credentials, UserOut
+from app.schemas import Credentials, TokenOut, UserOut
 
 router = APIRouter(tags=["auth"])
 
@@ -13,15 +13,15 @@ def register(creds: Credentials):
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "register not implemented")
 
 
-@router.post("/auth/login", response_model=UserOut)
+@router.post("/auth/login", response_model=TokenOut)
 def login(creds: Credentials):
-    # TODO(Week 2): verify password, set HTTP-only session cookie
+    # TODO(Week 2): verify password, return a signed JWT with an exp claim
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "login not implemented")
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout():
-    # TODO(Week 2): clear session cookie
+    # TODO(Week 2): return 204. JWTs are stateless, so the client discards its token
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "logout not implemented")
 
 
