@@ -34,14 +34,17 @@ pytestmark = pytest.mark.skipif(not TEST_DB, reason="set TEST_DATABASE_URL to ru
 @pytest.fixture(scope="module", autouse=True)
 def schema():
     if TEST_DB:
-        # The TRUNCATE below would wipe a real database, so require a _test name.
+        # The DROP below would wipe a real database, so require a _test name.
         dbname = conninfo_to_dict(TEST_DB).get("dbname", "")
         if not dbname.endswith("_test"):
             pytest.exit(f"TEST_DATABASE_URL must name a *_test database, got {dbname!r}")
         with psycopg.connect(TEST_DB) as conn:
+            # Rebuild from schema.sql every run. Its IF NOT EXISTS would keep an
+            # outdated table, and this also clears rows a crashed run committed.
+            conn.execute(
+                "DROP TABLE IF EXISTS revisions, analyses, job_descriptions, resumes, users"
+            )
             conn.execute(SCHEMA.read_text())
-            # Clears rows a crashed earlier run may have committed.
-            conn.execute("TRUNCATE users RESTART IDENTITY CASCADE")
 
 
 @pytest.fixture
@@ -67,13 +70,16 @@ def count(conn, table: str) -> int:
     return conn.execute(f"SELECT count(*) AS n FROM {table}").fetchone()["n"]
 
 
+JD_EXTRACTED = {"job_title": "Dev", "required_skills": []}
+
+
 def make_user(repos, email: str = "ann@example.com") -> int:
     return repos.users.create(email, "hash")
 
 
 def make_full_analysis(repos, user_id: int) -> tuple[int, int, int]:
     resume_id = repos.resumes.create(user_id, "cv.pdf", "Python dev", {"skills": "Python"})
-    jd_id = repos.jds.create(user_id, "Need Python", {"job_title": "Dev", "required_skills": []})
+    jd_id = repos.jds.create(user_id, resume_id, "Need Python", JD_EXTRACTED)
     analysis_id = repos.analyses.create(
         user_id, resume_id, 90, [], job_description_id=jd_id, match_score=70,
         keywords={"matched": ["Python"], "missing": []},
@@ -143,13 +149,11 @@ def test_resume_delete_removes_analyses_revisions_and_job_descriptions(conn, rep
     assert [r["id"] for r in conn.execute("SELECT id FROM job_descriptions")] == [other_jd]
 
 
-def test_resume_delete_keeps_job_description_another_resume_uses(conn, repos):
-    user_id = make_user(repos)
-    resume_a, jd_id, _ = make_full_analysis(repos, user_id)
-    resume_b = repos.resumes.create(user_id, "b.pdf", "text", {})
-    b_analysis = repos.analyses.create(user_id, resume_b, 80, [], job_description_id=jd_id)
-    assert repos.resumes.delete(user_id, resume_a)
-    assert repos.analyses.get(user_id, b_analysis)["job_description_id"] == jd_id
+# ---------- job descriptions ----------
+def test_rejects_job_description_on_other_users_resume(repos):
+    ann, bob = make_user(repos, "ann@x.com"), make_user(repos, "bob@x.com")
+    resume_id = repos.resumes.create(ann, "a.pdf", "text", {})
+    assert repos.jds.create(bob, resume_id, "text", JD_EXTRACTED) is None
 
 
 # ---------- analyses ----------
@@ -184,8 +188,15 @@ def test_rejects_analysis_on_other_users_resume(repos):
 def test_rejects_analysis_with_other_users_job_description(repos):
     ann, bob = make_user(repos, "ann@x.com"), make_user(repos, "bob@x.com")
     resume_id = repos.resumes.create(ann, "a.pdf", "text", {})
-    bob_jd = repos.jds.create(bob, "text", {"job_title": "x", "required_skills": []})
+    _, bob_jd, _ = make_full_analysis(repos, bob)
     assert repos.analyses.create(ann, resume_id, 90, [], job_description_id=bob_jd) is None
+
+
+def test_rejects_analysis_with_job_description_from_another_resume(repos):
+    user_id = make_user(repos)
+    _, jd_from_a, _ = make_full_analysis(repos, user_id)
+    resume_b = repos.resumes.create(user_id, "b.pdf", "text", {})
+    assert repos.analyses.create(user_id, resume_b, 80, [], job_description_id=jd_from_a) is None
 
 
 def test_rejects_other_users_analysis(repos):

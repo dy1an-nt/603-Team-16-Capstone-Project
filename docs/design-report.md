@@ -261,7 +261,7 @@ Parsing, ATS scoring, and match scoring run locally. Parsing and the ATS score s
 | --- | --- |
 | users | id, email (unique), password\_hash, created\_at |
 | resumes | id, user\_id (FK), filename, raw\_text, sections (JSONB), created\_at |
-| job\_descriptions | id, user\_id (FK), raw\_text, extracted (JSONB), created\_at |
+| job\_descriptions | id, resume\_id (FK), raw\_text, extracted (JSONB), created\_at |
 | analyses | id, resume\_id (FK), job\_description\_id (FK, nullable), ats\_score, match\_score, issues (JSONB), keywords (JSONB), created\_at |
 | revisions | id, analysis\_id (FK), suggestions (JSONB, with accepted flags), revised\_text, new\_match\_score, created\_at |
 

@@ -118,7 +118,7 @@ Then run pytest with the URL set (change the port if your PostgreSQL is not on 5
 TEST_DATABASE_URL=postgresql://resume:resume@localhost:5432/resume_reviewer_test pytest
 ```
 
-Each test rolls back its changes, and the suite clears all rows from that database when it starts. Never point it at `resume_reviewer`.
+Each test rolls back its changes, and the suite drops and recreates every table in that database when it starts, so it always matches `db/schema.sql`. Never point it at `resume_reviewer`.
 
 ## Workflow
 

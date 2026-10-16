@@ -92,20 +92,8 @@ class ResumeRepository:
         ).fetchone()
 
     def delete(self, user_id: int, resume_id: int) -> bool:
-        """Deletes the resume, its analyses and revisions, and their job descriptions (NFR-14)."""
-        # job_descriptions hangs off users, so the resume's FK cascade never reaches
-        # it. Skip any job description another resume's analysis still uses, since
-        # deleting it would cascade into that analysis.
-        self.conn.execute(
-            "DELETE FROM job_descriptions j WHERE j.id IN ("
-            "  SELECT a.job_description_id FROM analyses a"
-            "  JOIN resumes r ON r.id = a.resume_id"
-            "  WHERE r.id = %(resume)s AND r.user_id = %(user)s)"
-            " AND NOT EXISTS ("
-            "  SELECT 1 FROM analyses o"
-            "  WHERE o.job_description_id = j.id AND o.resume_id <> %(resume)s)",
-            {"resume": resume_id, "user": user_id},
-        )
+        """Deletes the resume and, by cascade, its job descriptions, analyses, and
+        revisions (NFR-14)."""
         cur = self.conn.execute(
             "DELETE FROM resumes WHERE id = %s AND user_id = %s", (resume_id, user_id)
         )
@@ -116,14 +104,18 @@ class JobDescriptionRepository:
     def __init__(self, conn: psycopg.Connection):
         self.conn = conn
 
-    def create(self, user_id: int, raw_text: str, extracted: dict) -> int:
-        """`extracted` is a validated schemas.JobRequirements, dumped."""
+    def create(self, user_id: int, resume_id: int, raw_text: str, extracted: dict) -> int | None:
+        """Returns None if the resume is not this user's.
+
+        `extracted` is a validated schemas.JobRequirements, dumped.
+        """
         row = self.conn.execute(
-            "INSERT INTO job_descriptions (user_id, raw_text, extracted)"
-            " VALUES (%s, %s, %s) RETURNING id",
-            (user_id, raw_text, Jsonb(extracted)),
+            "INSERT INTO job_descriptions (resume_id, raw_text, extracted)"
+            " SELECT r.id, %s, %s FROM resumes r WHERE r.id = %s AND r.user_id = %s"
+            " RETURNING id",
+            (raw_text, Jsonb(extracted), resume_id, user_id),
         ).fetchone()
-        return row["id"]
+        return row["id"] if row else None
 
 
 class AnalysisRepository:
@@ -140,14 +132,15 @@ class AnalysisRepository:
         match_score: int | None = None,
         keywords: dict | None = None,
     ) -> int | None:
-        """Returns None if the resume or job description is not this user's."""
+        """Returns None if the resume is not this user's, or the job description
+        belongs to a different resume."""
         row = self.conn.execute(
             "INSERT INTO analyses"
             " (resume_id, job_description_id, ats_score, match_score, issues, keywords)"
             " SELECT r.id, %(jd)s, %(ats)s, %(match)s, %(issues)s, %(keywords)s"
             " FROM resumes r WHERE r.id = %(resume)s AND r.user_id = %(user)s"
             " AND (%(jd)s::int IS NULL OR EXISTS ("
-            "  SELECT 1 FROM job_descriptions j WHERE j.id = %(jd)s AND j.user_id = %(user)s))"
+            "  SELECT 1 FROM job_descriptions j WHERE j.id = %(jd)s AND j.resume_id = r.id))"
             " RETURNING id",
             {
                 "user": user_id,
