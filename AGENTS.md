@@ -207,6 +207,11 @@ non-obvious pitfall, add one line here in the same pull request.
   statements instead (see `UserRepository.create`).
 - `tests/test_repositories.py` skips unless `TEST_DATABASE_URL` is set, so a
   local green run without it proves nothing about the data layer. CI sets it.
+- A `204` route that returns `None` still sends `content-type:
+  application/json` with an empty body. Return `Response(status_code=204)`
+  (see `routers/auth.py`). `api.js` skips parsing any 204 for the same reason.
+- bcrypt 5 raises on passwords over 72 bytes instead of truncating. Hash and
+  check through `app/security.py`, which truncates the same way both times.
 
 ## 9. Writing
 

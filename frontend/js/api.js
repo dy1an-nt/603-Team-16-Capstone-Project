@@ -15,7 +15,8 @@ async function apiRequest(path, options = {}) {
   const headers = { ...options.headers };
   if (token) headers.Authorization = `Bearer ${token}`;
   const resp = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  const body = resp.headers.get("content-type")?.includes("application/json")
+  // 204 has no body even when the server labels it JSON.
+  const body = resp.status !== 204 && resp.headers.get("content-type")?.includes("application/json")
     ? await resp.json()
     : null;
   if (!resp.ok) {
@@ -49,6 +50,11 @@ const api = {
       sessionStorage.removeItem(TOKEN_KEY);
     }
   },
+  deleteAccount: async () => {
+    await apiRequest("/account", { method: "DELETE" });
+    sessionStorage.removeItem(TOKEN_KEY);
+  },
+  isLoggedIn: () => sessionStorage.getItem(TOKEN_KEY) !== null,
   uploadResume: (file) => {
     const form = new FormData();
     form.append("file", file);

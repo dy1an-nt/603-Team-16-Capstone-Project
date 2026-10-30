@@ -13,6 +13,27 @@
   </header>
 
   <main>
+    <section class="card" id="account">
+      <h2>Account</h2>
+      <form id="auth-form">
+        <p>
+          <label for="auth-email">Email</label><br>
+          <input type="email" id="auth-email" autocomplete="username" required>
+        </p>
+        <p>
+          <label for="auth-password">Password (at least 8 characters)</label><br>
+          <input type="password" id="auth-password" autocomplete="current-password" minlength="8" required>
+        </p>
+        <button type="submit" id="login-btn">Log in</button>
+        <button type="button" id="register-btn">Register</button>
+      </form>
+      <div id="account-actions" hidden>
+        <button type="button" id="logout-btn">Log out</button>
+        <button type="button" id="delete-account-btn">Delete account</button>
+      </div>
+      <p id="account-status" class="muted" role="status"></p>
+    </section>
+
     <section class="card">
       <h2>1. Upload resume</h2>
       <input type="file" id="resume-file" accept=".pdf,.docx">

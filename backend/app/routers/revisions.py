@@ -1,10 +1,14 @@
 """Reviser: FR-16, FR-17, FR-19."""
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.schemas import ExportFormat, RevisionOut, RevisionUpdate
+from app.security import get_current_user
 
-router = APIRouter(prefix="/revisions", tags=["revisions"])
+# Every route here needs a logged-in user (NFR-8).
+router = APIRouter(
+    prefix="/revisions", tags=["revisions"], dependencies=[Depends(get_current_user)]
+)
 
 
 @router.patch("/{revision_id}", response_model=RevisionOut)

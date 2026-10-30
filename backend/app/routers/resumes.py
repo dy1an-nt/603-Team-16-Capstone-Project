@@ -1,10 +1,12 @@
 """Resume scanner: FR-4 to FR-8, FR-20. Security: NFR-9, NFR-11."""
 
-from fastapi import APIRouter, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 
 from app.schemas import ResumeOut, ResumeSummary
+from app.security import get_current_user
 
-router = APIRouter(prefix="/resumes", tags=["resumes"])
+# Every route here needs a logged-in user (NFR-8).
+router = APIRouter(prefix="/resumes", tags=["resumes"], dependencies=[Depends(get_current_user)])
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=ResumeOut)
