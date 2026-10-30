@@ -18,9 +18,11 @@ CREATE TABLE IF NOT EXISTS resumes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Belongs to the resume it was scored against, so deleting the resume removes
+-- it too (NFR-14). The owner is resumes.user_id.
 CREATE TABLE IF NOT EXISTS job_descriptions (
     id         SERIAL PRIMARY KEY,
-    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    resume_id  INTEGER NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
     raw_text   TEXT NOT NULL,
     extracted  JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -47,6 +49,6 @@ CREATE TABLE IF NOT EXISTS revisions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_resumes_user ON resumes(user_id);
-CREATE INDEX IF NOT EXISTS idx_jd_user ON job_descriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_jd_resume ON job_descriptions(resume_id);
 CREATE INDEX IF NOT EXISTS idx_analyses_resume ON analyses(resume_id);
 CREATE INDEX IF NOT EXISTS idx_revisions_analysis ON revisions(analysis_id);

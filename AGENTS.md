@@ -201,6 +201,12 @@ non-obvious pitfall, add one line here in the same pull request.
 - `sentence-transformers` is commented out in `requirements.txt` until
   Week 5. It is a large download. Load the model once at startup, never per
   request.
+- psycopg's `conn.transaction()` commits on exit when it is the first
+  statement on a connection, which breaks the one-transaction-per-request
+  rule in `db.get_db`. Inside a repository, use explicit `SAVEPOINT`
+  statements instead (see `UserRepository.create`).
+- `tests/test_repositories.py` skips unless `TEST_DATABASE_URL` is set, so a
+  local green run without it proves nothing about the data layer. CI sets it.
 
 ## 9. Writing
 

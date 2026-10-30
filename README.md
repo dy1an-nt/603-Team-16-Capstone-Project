@@ -106,6 +106,20 @@ pytest
 ruff check .
 ```
 
+The database tests in `tests/test_repositories.py` are skipped unless `TEST_DATABASE_URL` points at a throwaway database. CI always runs them. To run them locally, create the test database once:
+
+```bash
+psql -U postgres -c "CREATE DATABASE resume_reviewer_test OWNER resume;"
+```
+
+Then run pytest with the URL set (change the port if your PostgreSQL is not on 5432):
+
+```bash
+TEST_DATABASE_URL=postgresql://resume:resume@localhost:5432/resume_reviewer_test pytest
+```
+
+Each test rolls back its changes, and the suite drops and recreates every table in that database when it starts, so it always matches `db/schema.sql`. Never point it at `resume_reviewer`.
+
 ## Workflow
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for branching, commits, and pull requests.
