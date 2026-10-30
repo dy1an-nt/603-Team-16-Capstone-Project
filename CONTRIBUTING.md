@@ -42,10 +42,10 @@ Keep PRs small. One feature or fix per PR is easier to review than a week of wor
 ## Before opening a PR
 
 ```bash
-cd backend
-ruff check .
-pytest
+npm run check
 ```
+
+That runs ruff and then pytest from the repo root. See the npm scripts table in the README.
 
 ## Rules
 
