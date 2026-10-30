@@ -158,8 +158,8 @@ style choice.
 Work is not done until each line is true. If a check failed or could not
 run, say so plainly. "Should work" is not a status.
 
-1. `ruff check .` passes in `backend/`.
-2. `pytest` passes in `backend/`. New logic in `services/` has a test,
+1. `npm run lint` (`ruff check .` in `backend/`) passes.
+2. `npm test` (`pytest` in `backend/`) passes. New logic in `services/` has a test,
    including at least one bad-input case. LLM code is tested with a fake
    client. Tests never call Groq.
 3. The changed flow was exercised, not just written: hit the endpoint with

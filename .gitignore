@@ -14,6 +14,9 @@ venv/
 .coverage
 htmlcov/
 
+# Node (package.json has no dependencies, but keep installs out of git)
+node_modules/
+
 # Uploads and local data
 uploads/
 *.sqlite3

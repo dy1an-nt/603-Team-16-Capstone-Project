@@ -12,7 +12,7 @@
 
 ## Checklist
 
-- [ ] `ruff check .` passes
-- [ ] `pytest` passes
+- [ ] `npm run lint` (ruff) passes
+- [ ] `npm test` (pytest) passes
 - [ ] No secrets, `.env`, or real resumes committed
 - [ ] New service logic has a test

@@ -44,6 +44,9 @@ frontend/
   css/
   js/
 docs/                Report, diagrams, meeting notes
+scripts/
+  py.mjs             Runs backend/.venv Python for the npm scripts
+package.json         npm scripts (no npm packages)
 ```
 
 ## Local setup
@@ -51,6 +54,7 @@ docs/                Report, diagrams, meeting notes
 ### 1. Prerequisites
 
 - Python 3.11+
+- Node.js 18+ (for the `npm run` shortcuts below; no npm packages are installed)
 - PostgreSQL 16 installed locally ([download](https://www.postgresql.org/download/); macOS: `brew install postgresql@16`)
 - A Groq API key from https://console.groq.com
 
@@ -79,21 +83,23 @@ To reset the tables later, rerun the last command (the schema uses `IF NOT EXIST
 
 ### 4. Backend
 
+From the repo root, install once, then start the API:
+
 ```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt -r requirements-dev.txt
-uvicorn app.main:app --reload
+npm run setup
+npm run backend
 ```
+
+`npm run setup` creates `backend/.venv` and installs `requirements.txt` and `requirements-dev.txt` into it. Rerun it after pulling a change to either file. The npm scripts use that venv directly, so you never need to activate it.
 
 API runs at http://localhost:8000. Interactive docs at http://localhost:8000/docs.
 
 ### 5. Frontend
 
+In a second terminal:
+
 ```bash
-cd frontend
-python -m http.server 5500
+npm run frontend
 ```
 
 Open http://localhost:5500.
@@ -101,10 +107,40 @@ Open http://localhost:5500.
 ### 6. Tests and lint
 
 ```bash
-cd backend
-pytest
-ruff check .
+npm run check
 ```
+
+That runs `npm run lint` (ruff) and then `npm test` (pytest). Arguments after `--` go to pytest, e.g. `npm test -- -k auth`.
+
+### npm scripts
+
+All run from the repo root. They are defined in `package.json` and run Python through `scripts/py.mjs`.
+
+| Command | Runs |
+| --- | --- |
+| `npm run setup` | Creates `backend/.venv` if missing and installs the Python requirements |
+| `npm run backend` | `uvicorn app.main:app --reload` in `backend/` |
+| `npm run frontend` | A static server for `frontend/` on port 5500 |
+| `npm run lint` | `ruff check .` in `backend/` |
+| `npm test` | `pytest` in `backend/` |
+| `npm run check` | `lint`, then `test`, the same checks CI runs |
+
+If `setup` picks the wrong Python, set `PYTHON` to the interpreter path first, e.g. `PYTHON=python3.12 npm run setup`.
+
+<details>
+<summary>Without npm</summary>
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt -r requirements-dev.txt
+uvicorn app.main:app --reload    # backend
+ruff check . && pytest           # lint and tests
+python -m http.server 5500 --directory ../frontend   # frontend, in another terminal
+```
+
+</details>
 
 ## Workflow
 
@@ -134,7 +170,7 @@ What the agents are told to do:
 - **Stay on their own branch.** No commits or pushes to `main`, no merging, no force pushes, and no touching a teammate's branch or uncommitted work without asking.
 - **Open their own PRs.** When a task is done and checks pass, the agent commits, pushes its feature branch, and opens a PR into `main` with the template filled in. A teammate reviews and merges. Agents never merge.
 - **Keep diffs small.** One task per branch. Unrelated bugs get reported, not quietly fixed in the same PR.
-- **Prove it works.** `ruff check .` and `pytest` pass, the changed flow is actually run, and the report says which checks ran and which could not.
+- **Prove it works.** `npm run check` (ruff and pytest) passes, the changed flow is actually run, and the report says which checks ran and which could not.
 - **Flag team decisions.** Schema changes, new dependencies, API shape changes, and scoring weights need a human OK.
 
 Tips for teammates:
