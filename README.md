@@ -11,7 +11,7 @@ Web app that scans a resume, scores it for ATS compatibility, compares it agains
 | Dylan | Team lead, full stack |
 | Ajmaluddin | Backend |
 | John | Frontend |
-| Emma | TBD |
+| Emma | Frontend|
 
 ## Stack
 
