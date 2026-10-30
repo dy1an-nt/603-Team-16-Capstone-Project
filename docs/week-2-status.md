@@ -1,7 +1,7 @@
 # Week 2 status: accounts and auth
 
 Milestone: Oct 26 to Nov 1, 2026, FR-1 to FR-3 ([design-report.md](design-report.md)
-section 14). Endpoint shapes: [api-contract.md](api-contract.md). Last updated Oct 29.
+section 14). Endpoint shapes: [api-contract.md](api-contract.md). Last updated Oct 29 (evening).
 
 ## Checklist
 
@@ -11,22 +11,24 @@ section 14). Endpoint shapes: [api-contract.md](api-contract.md). Last updated O
 - [x] FR-3 delete account: cascades to every table (NFR-14), old token then gets 401
 - [x] NFR-8: every route except register, login, and health needs a bearer token
 - [x] Minimal account form in `frontend/index.html` (register, log in, log out, delete)
-- [ ] Teammate review of PR #6 (data layer and `job_descriptions` schema change)
-- [ ] Teammate review of PR #7 (auth), then retarget it to `main` after PR #6 merges
+- [x] PR #6 (data layer and `job_descriptions` schema change) merged Oct 29
+- [x] PR #7 (auth) retargeted to `main`
+- [ ] Teammate review and merge of PR #7 (auth)
+- [ ] Teammate review and merge of PR #8 (npm scripts, not a Week 2 requirement)
 - [ ] Frontend team restyles the account form (structure and IDs below)
 
 ## Pull requests
 
 | PR | Branch | State |
 | --- | --- | --- |
-| [#6](https://github.com/dy1an-nt/603-Team-16-Capstone-Project/pull/6) | `feature/db-repositories` | Open, CI green, needs review. Auth builds on it. |
-| [#7](https://github.com/dy1an-nt/603-Team-16-Capstone-Project/pull/7) | `feature/auth-accounts` | Open, base is `feature/db-repositories` (stacked on #6). Needs review. |
+| [#6](https://github.com/dy1an-nt/603-Team-16-Capstone-Project/pull/6) | `feature/db-repositories` | Merged Oct 29. |
+| [#7](https://github.com/dy1an-nt/603-Team-16-Capstone-Project/pull/7) | `feature/auth-accounts` | Open against `main`. Needs a teammate review. |
+| [#8](https://github.com/dy1an-nt/603-Team-16-Capstone-Project/pull/8) | `chore/npm-scripts` | Open against `main`. Needs a teammate review. Adds Node 18+ as a prerequisite. |
 
 ## Blockers
 
-- The auth PR cannot merge before PR #6. It needs `UserRepository` and `get_db` from #6.
-  Merge #6 first, then change the auth PR's base to `main`.
-- PR #6 changes `job_descriptions`. Anyone with a local database runs the SQL in its
+- None blocking. PR #7 waits only on a teammate review.
+- PR #6 changed `job_descriptions`. Anyone with a local database runs the SQL in its
   description once.
 - `pyjwt` is a new dependency. Run `pip install -r requirements.txt` after pulling.
 
@@ -44,6 +46,7 @@ section 14). Endpoint shapes: [api-contract.md](api-contract.md). Last updated O
 
 ## Next action (through Nov 1)
 
-1. A teammate reviews and merges PR #6.
-2. Retarget the auth PR to `main`, then a teammate reviews and merges it.
-3. Week 3 (FR-4 to FR-8) starts from `main` after both merge.
+1. A teammate reviews and merges PR #7 by Nov 1.
+2. A teammate reviews PR #8. After it merges, `npm run setup` and `npm run check` replace the
+   pip, ruff, and pytest commands.
+3. Week 3 (FR-4 to FR-8) starts from `main` after PR #7 merges.
