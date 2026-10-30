@@ -12,7 +12,7 @@ section 14). Endpoint shapes: [api-contract.md](api-contract.md). Last updated O
 - [x] NFR-8: every route except register, login, and health needs a bearer token
 - [x] Minimal account form in `frontend/index.html` (register, log in, log out, delete)
 - [ ] Teammate review of PR #6 (data layer and `job_descriptions` schema change)
-- [ ] Teammate review of the auth PR, then retarget it to `main` after PR #6 merges
+- [ ] Teammate review of PR #7 (auth), then retarget it to `main` after PR #6 merges
 - [ ] Frontend team restyles the account form (structure and IDs below)
 
 ## Pull requests
@@ -20,7 +20,7 @@ section 14). Endpoint shapes: [api-contract.md](api-contract.md). Last updated O
 | PR | Branch | State |
 | --- | --- | --- |
 | [#6](https://github.com/dy1an-nt/603-Team-16-Capstone-Project/pull/6) | `feature/db-repositories` | Open, CI green, needs review. Auth builds on it. |
-| Auth PR (link added after it opens) | `feature/auth-accounts` | Stacked on #6 |
+| [#7](https://github.com/dy1an-nt/603-Team-16-Capstone-Project/pull/7) | `feature/auth-accounts` | Open, base is `feature/db-repositories` (stacked on #6). Needs review. |
 
 ## Blockers
 
