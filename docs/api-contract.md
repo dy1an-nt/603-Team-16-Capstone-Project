@@ -212,7 +212,7 @@ Errors: `404`.
 
 ### DELETE /resumes/{id} (FR-20)
 
-Deletes the resume and, by cascade, its analyses and revisions.
+Deletes the resume and, by cascade, its job descriptions, analyses, and revisions.
 
 ```http
 DELETE /resumes/12
@@ -421,7 +421,8 @@ before building on a different reading.
 - Job descriptions are pasted text only. FR-11 also mentions upload. That
   can be added later as a separate field without breaking this shape.
 - `POST /analyses` always stores the pasted text as a new `job_descriptions`
-  row. There is no endpoint to list or reuse saved job descriptions.
+  row tied to that resume. There is no endpoint to list or reuse saved job
+  descriptions.
 - There is no `GET /analyses` list endpoint, since report section 8 does not
   have one. History (FR-20) lists resumes. Listing past analyses per resume
   needs a new endpoint and a team decision.
