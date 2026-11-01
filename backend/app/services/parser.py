@@ -8,7 +8,6 @@ import zipfile
 import pdfplumber
 from docx import Document
 
-
 SECTION_ALIASES: dict[str, list[str]] = {
     "summary": [
         "summary",

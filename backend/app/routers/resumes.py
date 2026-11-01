@@ -4,7 +4,6 @@
 from typing import Annotated
 
 import psycopg
-
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 
 from app.config import get_settings
@@ -13,7 +12,6 @@ from app.repositories import ResumeRepository
 from app.schemas import ResumeOut, ResumeSummary
 from app.security import CurrentUser, get_current_user
 from app.services import parser
-
 
 # Every route here needs a logged-in user (NFR-8).
 router = APIRouter(
