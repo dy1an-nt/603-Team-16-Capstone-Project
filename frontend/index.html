@@ -8,13 +8,16 @@
 </head>
 <body>
   <header class="site-header">
+    <p class="eyebrow">YOUR NEXT OPPORTUNITY STARTS HERE</p>
     <h1>Resume Reviewer</h1>
+    <p>See what an ATS can read before you apply.</p>
     <p id="api-status" class="muted">Checking API...</p>
   </header>
 
   <main>
     <section class="card" id="account">
       <h2>Account</h2>
+      <p class="muted">Log in to upload and save your resume, or register to get started.</p>
       <form id="auth-form">
         <p>
           <label for="auth-email">Email</label><br>
@@ -25,26 +28,43 @@
           <input type="password" id="auth-password" autocomplete="current-password" minlength="8" required>
         </p>
         <button type="submit" id="login-btn">Log in</button>
-        <button type="button" id="register-btn">Register</button>
+        <button type="button" class="secondary" id="register-btn">Register</button>
       </form>
       <div id="account-actions" hidden>
         <button type="button" id="logout-btn">Log out</button>
-        <button type="button" id="delete-account-btn">Delete account</button>
+        <button type="button" class="danger" id="delete-account-btn">Delete account</button>
       </div>
       <p id="account-status" class="muted" role="status"></p>
     </section>
 
-    <section class="card">
-      <h2>1. Upload resume</h2>
-      <input type="file" id="resume-file" accept=".pdf,.docx">
+    <section class="card" id="upload">
+      <p class="eyebrow">STEP 1</p>
+      <h2>Upload your resume</h2>
+      <p class="muted" id="upload-help">Choose a PDF or DOCX. The server checks the file type and size before parsing.</p>
+      <form id="upload-form">
+        <label for="resume-file">Resume file</label>
+        <input type="file" id="resume-file" accept=".pdf,.docx" aria-describedby="upload-help" required>
+        <button id="upload-btn" type="submit">Upload and view sections</button>
+      </form>
+      <p id="upload-status" role="status" aria-live="polite">Log in to upload a resume.</p>
+    </section>
+
+    <section class="card" id="parsed-resume" hidden aria-labelledby="parsed-title">
+      <p class="eyebrow">PARSED RESUME</p>
+      <h2 id="parsed-title" tabindex="-1">What an ATS can read</h2>
+      <p id="resume-filename" class="muted"></p>
+      <p>Review the extracted text below. Missing or garbled text may need changes in your original document.</p>
+      <div id="parsed-sections"></div>
     </section>
 
     <section class="card">
       <h2>2. Job description</h2>
-      <textarea id="job-text" rows="8" placeholder="Paste the job description"></textarea>
+      <p class="muted" id="analysis-help">Job matching and scoring will be available in a later milestone.</p>
+      <label for="job-text">Job posting</label>
+      <textarea disabled id="job-text" rows="8" placeholder="Paste the job description"></textarea>
     </section>
 
-    <button id="analyze-btn" type="button">Analyze</button>
+    <button id="analyze-btn" type="button" disabled aria-describedby="analysis-help">Analyze</button>
 
     <section class="card" id="results" hidden>
       <h2>Results</h2>

@@ -21,7 +21,9 @@ async function apiRequest(path, options = {}) {
     : null;
   if (!resp.ok) {
     if (resp.status === 401) sessionStorage.removeItem(TOKEN_KEY);
-    throw new Error(errorMessage(body, resp.status));
+    const error = new Error(errorMessage(body, resp.status));
+    error.status = resp.status;
+    throw error;
   }
   return body;
 }
