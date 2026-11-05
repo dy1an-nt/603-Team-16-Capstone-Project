@@ -46,6 +46,9 @@ No pull request has been opened or reviewed.
 - Run `npm run setup` and configure `.env` according to `README.md`.
 - A real browser check is still required because browser installation failed
   in the preparation environment.
+- Live upload testing returns "Upload failed. Check that the backend is
+  running and try again." Cause is undiagnosed. Upload and parsed-section
+  display still need successful end-to-end verification.
 
 ## Frontend handoff
 
