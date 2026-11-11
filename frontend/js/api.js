@@ -1,5 +1,6 @@
 // Thin wrapper around the backend API. Calls send the JWT from login as a bearer token.
-const API_BASE = "http://localhost:8000";
+// Relative, because the backend serves this page, locally and on Cloud Run.
+const API_BASE = "";
 // sessionStorage, so the token is gone when the tab closes.
 const TOKEN_KEY = "accessToken";
 

@@ -195,9 +195,12 @@ non-obvious pitfall, add one line here in the same pull request.
   defaults silently.
 - `db/schema.sql` only creates missing tables. Edits to an existing table
   need an `ALTER TABLE` statement shared with the team (section 6, item 5).
-- `frontend/js/api.js` hardcodes `API_BASE = "http://localhost:8000"`. The
-  report's deploy plan changes it to a relative path. Do not add a second
-  base URL anywhere.
+- `frontend/js/api.js` uses a relative `API_BASE` because FastAPI serves
+  `frontend/` (mounted last in `app/main.py`). Open the app on port 8000,
+  not from a separate static server. Do not add a second base URL anywhere.
+- An unhandled 500 response carries no CORS headers, so a cross-origin
+  browser call reports "Failed to fetch" instead of the status. Check the
+  uvicorn log before debugging the frontend.
 - `sentence-transformers` is commented out in `requirements.txt` until
   Week 5. It is a large download. Load the model once at startup, never per
   request.

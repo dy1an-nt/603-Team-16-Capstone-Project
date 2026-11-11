@@ -1,0 +1,9 @@
+# Files `gcloud run deploy --source .` leaves out of the upload.
+# Pulling in .gitignore keeps .env and local venvs off Cloud Build.
+.gcloudignore
+.git
+.gitignore
+.github/
+docs/
+backend/tests/
+#!include:.gitignore

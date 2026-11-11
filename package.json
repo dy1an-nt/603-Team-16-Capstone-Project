@@ -1,14 +1,13 @@
 {
   "name": "resume-reviewer",
   "private": true,
-  "description": "npm shortcuts for the Python backend and static frontend. No npm packages to install.",
+  "description": "npm shortcuts for the Python backend, which also serves the frontend. No npm packages to install.",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
     "setup": "node scripts/py.mjs setup",
     "backend": "node scripts/py.mjs -m uvicorn app.main:app --reload",
-    "frontend": "node scripts/py.mjs -m http.server 5500 --directory ../frontend",
     "lint": "node scripts/py.mjs -m ruff check .",
     "test": "node scripts/py.mjs -m pytest",
     "check": "npm run lint && npm test"
