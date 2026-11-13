@@ -14,7 +14,6 @@ from app.config import get_settings
 from app.db import get_db
 from app.main import api as app
 from app.repositories import ResumeRepository
-from app.security import get_current_user
 
 TEST_DB = os.environ.get("TEST_DATABASE_URL")
 SCHEMA = Path(__file__).resolve().parents[2] / "db" / "schema.sql"
