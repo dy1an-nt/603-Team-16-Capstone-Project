@@ -66,12 +66,24 @@ class ResumeRepository:
         self.conn = conn
 
     def create(
-        self, user_id: int, filename: str | None, raw_text: str, sections: dict[str, str]
+        self,
+        user_id: int,
+        filename: str | None,
+        raw_text: str,
+        sections: dict[str, str],
+        parsing_metadata: dict | None = None,
     ) -> int:
         row = self.conn.execute(
-            "INSERT INTO resumes (user_id, filename, raw_text, sections)"
-            " VALUES (%s, %s, %s, %s) RETURNING id",
-            (user_id, filename, raw_text, Jsonb(sections)),
+            "INSERT INTO resumes "
+            "(user_id, filename, raw_text, sections, parsing_metadata) "
+            "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (
+                user_id,
+                filename,
+                raw_text,
+                Jsonb(sections),
+                Jsonb(parsing_metadata or {}),
+            ),
         ).fetchone()
         return row["id"]
 
@@ -86,7 +98,7 @@ class ResumeRepository:
     def get(self, user_id: int, resume_id: int) -> dict | None:
         """Shaped like schemas.ResumeOut, plus raw_text for scoring."""
         return self.conn.execute(
-            "SELECT id, filename, raw_text, sections, created_at FROM resumes"
+            "SELECT id, filename, raw_text, sections, parsing_metadata, created_at FROM resumes"
             " WHERE id = %s AND user_id = %s",
             (resume_id, user_id),
         ).fetchone()

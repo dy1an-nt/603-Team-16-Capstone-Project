@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS resumes (
     filename   TEXT,
     raw_text   TEXT NOT NULL,
     sections   JSONB NOT NULL DEFAULT '{}'::jsonb,
+    parsing_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
