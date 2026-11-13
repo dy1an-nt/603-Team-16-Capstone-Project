@@ -1,9 +1,8 @@
-
-from fastapi.testclient import TestClient
 from fastapi.routing import APIRoute
+from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.main import app, api
+from app.main import api, app
 
 settings = get_settings()
 

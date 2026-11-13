@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.main import api as app
+from app.main import api, app
 from app.security import (
     ALGORITHM,
     create_access_token,
@@ -147,7 +147,7 @@ def test_non_bearer_scheme_is_rejected():
 def test_every_route_except_register_login_health_requires_auth():
     # The OpenAPI schema lists HTTPBearer on each route that takes the token.
     open_routes = {"/auth/register", "/auth/login", "/health"}
-    for path, methods in app.openapi()["paths"].items():
+    for path, methods in api.openapi()["paths"].items():
         for method, op in methods.items():
             secured = {"HTTPBearer": []} in op.get("security", [])
             assert secured == (path not in open_routes), f"{method.upper()} {path}"

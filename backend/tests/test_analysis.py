@@ -12,7 +12,7 @@ from psycopg.rows import dict_row
 
 from app.config import get_settings
 from app.db import get_db
-from app.main import api as app
+from app.main import api, app
 from app.repositories import ResumeRepository
 
 TEST_DB = os.environ.get("TEST_DATABASE_URL")
@@ -60,9 +60,9 @@ def client(monkeypatch):
     with psycopg.connect(TEST_DB) as conn:
         conn.execute("TRUNCATE users RESTART IDENTITY CASCADE")
 
-    app.dependency_overrides[get_db] = _test_db
+    api.dependency_overrides[get_db] = _test_db
     yield TestClient(app)
-    app.dependency_overrides.clear()
+    api.dependency_overrides.clear()
 
 
 def register(client, credentials=ANN):
