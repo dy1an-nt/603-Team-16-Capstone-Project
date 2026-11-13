@@ -51,7 +51,7 @@ async def upload_resume(
         )
 
     try:
-        raw_text = parser.extract_text(data, filename)
+        raw_text, parsing_metadata = parser.extract_document(data, filename)
     except ValueError as exc:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -67,6 +67,7 @@ async def upload_resume(
         filename,
         raw_text,
         sections,
+        parsing_metadata,
     )
 
     return repository.get(user["id"], resume_id)

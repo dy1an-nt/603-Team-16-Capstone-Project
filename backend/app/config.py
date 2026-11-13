@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     frontend_origin: str = "http://localhost:5500"
     max_upload_mb: int = 5
+    libreoffice_path: str = "soffice"
 
 
 @lru_cache
