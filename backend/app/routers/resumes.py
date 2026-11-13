@@ -5,6 +5,7 @@ from typing import Annotated
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 
 from app.config import get_settings
 from app.db import get_db
@@ -51,7 +52,11 @@ async def upload_resume(
         )
 
     try:
-        raw_text = parser.extract_text(data, filename)
+        # Parsing is blocking (pdfplumber, and LibreOffice for DOCX), so it runs
+        # in a worker thread instead of stalling every other request.
+        raw_text, parsing_metadata = await run_in_threadpool(
+            parser.extract_document, data, filename
+        )
     except ValueError as exc:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -67,6 +72,7 @@ async def upload_resume(
         filename,
         raw_text,
         sections,
+        parsing_metadata,
     )
 
     return repository.get(user["id"], resume_id)

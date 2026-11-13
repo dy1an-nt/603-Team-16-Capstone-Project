@@ -16,7 +16,7 @@ from psycopg.rows import dict_row
 
 from app.config import get_settings
 from app.db import get_db
-from app.main import app
+from app.main import api, app
 from app.repositories import (
     AnalysisRepository,
     JobDescriptionRepository,
@@ -60,9 +60,9 @@ def client(monkeypatch):
     monkeypatch.setattr(get_settings(), "secret_key", "test-secret-at-least-32-bytes-long-0123")
     with psycopg.connect(TEST_DB) as conn:
         conn.execute("TRUNCATE users RESTART IDENTITY CASCADE")
-    app.dependency_overrides[get_db] = _test_db
+    api.dependency_overrides[get_db] = _test_db
     yield TestClient(app)
-    app.dependency_overrides.clear()
+    api.dependency_overrides.clear()
 
 
 def count(table: str) -> int:
