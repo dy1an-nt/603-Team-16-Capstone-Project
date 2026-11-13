@@ -92,19 +92,9 @@ npm run backend
 
 `npm run setup` creates `backend/.venv` and installs `requirements.txt` and `requirements-dev.txt` into it. Rerun it after pulling a change to either file. The npm scripts use that venv directly, so you never need to activate it.
 
-API runs at http://localhost:8000. Interactive docs at http://localhost:8000/docs.
+Open http://localhost:8000. The backend serves the frontend too, so there is no second server. Interactive API docs are at http://localhost:8000/docs.
 
-### 5. Frontend
-
-In a second terminal:
-
-```bash
-npm run frontend
-```
-
-Open http://localhost:5500.
-
-### 6. Tests and lint
+### 5. Tests and lint
 
 ```bash
 npm run check
@@ -133,8 +123,7 @@ All run from the repo root. They are defined in `package.json` and run Python th
 | Command | Runs |
 | --- | --- |
 | `npm run setup` | Creates `backend/.venv` if missing and installs the Python requirements |
-| `npm run backend` | `uvicorn app.main:app --reload` in `backend/` |
-| `npm run frontend` | A static server for `frontend/` on port 5500 |
+| `npm run backend` | `uvicorn app.main:app --reload` in `backend/`, serving the API and the frontend |
 | `npm run lint` | `ruff check .` in `backend/` |
 | `npm test` | `pytest` in `backend/` |
 | `npm run check` | `lint`, then `test`, the same checks CI runs |
@@ -149,9 +138,8 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt -r requirements-dev.txt
-uvicorn app.main:app --reload    # backend
+uvicorn app.main:app --reload    # API and frontend on http://localhost:8000
 ruff check . && pytest           # lint and tests
-python -m http.server 5500 --directory ../frontend   # frontend, in another terminal
 ```
 
 </details>

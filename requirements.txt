@@ -1,0 +1,2 @@
+# Cloud Run's Python buildpack installs from the repo root. The real list is in backend/.
+-r backend/requirements.txt
