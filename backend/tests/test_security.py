@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.main import app
+from app.main import api as app
 from app.security import (
     ALGORITHM,
     create_access_token,

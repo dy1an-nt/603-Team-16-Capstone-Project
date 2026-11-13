@@ -12,7 +12,7 @@ from psycopg.rows import dict_row
 
 from app.config import get_settings
 from app.db import get_db
-from app.main import app
+from app.main import api as app
 from app.repositories import ResumeRepository
 from app.security import get_current_user
 
