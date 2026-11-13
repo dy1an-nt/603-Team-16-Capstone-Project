@@ -201,6 +201,10 @@ non-obvious pitfall, add one line here in the same pull request.
 - `sentence-transformers` is commented out in `requirements.txt` until
   Week 5. It is a large download. Load the model once at startup, never per
   request.
+- DOCX page count and rendered layout come from LibreOffice (`soffice`).
+  It is best effort: if it is missing or fails, the upload still succeeds
+  and `page_count` is `None`. Each run needs its own `-env:UserInstallation`
+  profile, or concurrent conversions fail silently.
 - psycopg's `conn.transaction()` commits on exit when it is the first
   statement on a connection, which breaks the one-transaction-per-request
   rule in `db.get_db`. Inside a repository, use explicit `SAVEPOINT`

@@ -1,11 +1,10 @@
 import base64
-
 from io import BytesIO
+
 from docx import Document
 
 from app.schemas import JobRequirements, Suggestion, SuggestionDraft
 from app.services import ats_scorer, grounding, match_scorer, parser
-
 
 RESUME = """Jane Doe
 jane@example.com
@@ -75,6 +74,32 @@ def test_contact_info_rule_accepts_email_or_phone():
     _, issues = ats_scorer.score(sections)
 
     assert "missing_contact_info" not in {issue.rule for issue in issues}
+
+
+def test_contact_info_rule_ignores_date_ranges():
+    sections = valid_sections()
+    sections["contact"] = "Jane Doe"
+    sections["experience"] = "Engineer, Acme 2019-2023\nAnalyst 2015 2016 2018"
+
+    _, issues = ats_scorer.score(sections)
+
+    assert "missing_contact_info" in {issue.rule for issue in issues}
+
+
+def test_contact_info_rule_accepts_common_phone_formats():
+    for phone in [
+        "(555) 123-4567",
+        "+44 20 7946 0958",
+        "555.123.4567",
+        "555-123-4567 555-987-6543",
+        "Raleigh NC 27601-1234 555-123-4567",
+    ]:
+        sections = valid_sections()
+        sections["contact"] = f"Jane Doe {phone}"
+
+        _, issues = ats_scorer.score(sections)
+
+        assert "missing_contact_info" not in {issue.rule for issue in issues}, phone
 
 
 def test_multi_column_layout_rule():
@@ -325,9 +350,9 @@ def test_extract_document_detects_docx_structure(monkeypatch):
 
 
 def test_extract_document_detects_unusual_symbols():
-    assert parser._has_unusual_symbols("Jane Doe � Python")
-    assert parser._has_unusual_symbols("Name \ue000")
-    assert not parser._has_unusual_symbols("José — Python • SQL")
+    assert parser.has_unusual_symbols("Jane Doe � Python")
+    assert parser.has_unusual_symbols("Name \ue000")
+    assert not parser.has_unusual_symbols("José — Python • SQL")
 def test_extract_document_detects_header_image(monkeypatch):
     document = Document()
 

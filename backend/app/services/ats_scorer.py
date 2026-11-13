@@ -3,7 +3,7 @@
 import re
 
 from app.schemas import AtsIssue
-
+from app.services.parser import has_unusual_symbols
 
 REQUIRED_SECTIONS = ["experience", "education", "skills"]
 
@@ -54,17 +54,46 @@ class MissingContactInfoRule:
         r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"
     )
 
-    PHONE_PATTERN = re.compile(
-        r"(?<!\w)(?:\+?\d{1,3}[\s.-]?)?"
-        r"(?:\(?\d{2,4}\)?[\s.-]?)?"
-        r"\d{3,4}[\s.-]?\d{3,4}(?!\w)"
-    )
+    # A run of digits and phone separators on one line. Whether it is a phone
+    # number is decided by _is_phone, since a date range like "2019 - 2023"
+    # has the same shape.
+    PHONE_CANDIDATE = re.compile(r"(?<!\w)\+?\(?\d[\d \t().-]{6,}\d(?!\w)")
+
+    @staticmethod
+    def _is_phone(candidate: str) -> bool:
+        groups = re.findall(r"\d+", candidate)
+        digits = "".join(groups)
+
+        # National numbers with area code have at least 10 digits, and E.164
+        # allows at most 15.
+        if not 10 <= len(digits) <= 15:
+            return False
+
+        # Runs of years, e.g. "2015 2016 2019".
+        return not all(
+            len(group) == 4 and 1900 <= int(group) <= 2099 for group in groups
+        )
+
+    @classmethod
+    def _contains_phone(cls, candidate: str) -> bool:
+        # The candidate can join a phone with a neighboring number, such as a
+        # ZIP code or a second phone, so test each run of whole tokens.
+        tokens = candidate.split()
+
+        return any(
+            cls._is_phone(" ".join(tokens[start:end]))
+            for start in range(len(tokens))
+            for end in range(start + 1, len(tokens) + 1)
+        )
 
     def check(self, sections: dict[str, str], metadata: dict) -> list[AtsIssue]:
         text = _get_resume_text(sections)
 
         has_email = bool(self.EMAIL_PATTERN.search(text))
-        has_phone = bool(self.PHONE_PATTERN.search(text))
+        has_phone = any(
+            self._contains_phone(match.group())
+            for match in self.PHONE_CANDIDATE.finditer(text)
+        )
 
         if has_email or has_phone:
             return []
@@ -129,7 +158,10 @@ class HeaderFooterContentRule:
             AtsIssue(
                 rule="header_footer_content",
                 message="The resume contains text or images in its headers or footers.",
-                fix="Move important contact details and resume content into the main document body.",
+                fix=(
+                    "Move important contact details and resume content"
+                    " into the main document body."
+                ),
                 penalty=PENALTIES["header_footer_content"],
             )
         ]
@@ -204,36 +236,19 @@ class UnusualSymbolsRule:
     def check(self, sections: dict[str, str], metadata: dict) -> list[AtsIssue]:
         text = _get_resume_text(sections)
 
-        has_unusual_symbols = metadata.get("has_unusual_symbols", False)
-
-        if not has_unusual_symbols:
-            for char in text:
-                codepoint = ord(char)
-
-                if char == "\ufffd":
-                    has_unusual_symbols = True
-                    break
-
-                if (
-                    0xE000 <= codepoint <= 0xF8FF
-                    or 0xF0000 <= codepoint <= 0xFFFFD
-                    or 0x100000 <= codepoint <= 0x10FFFD
-                ):
-                    has_unusual_symbols = True
-                    break
-
-                if codepoint < 32 and char not in "\n\r\t":
-                    has_unusual_symbols = True
-                    break
-
-        if not has_unusual_symbols:
+        if not (
+            metadata.get("has_unusual_symbols", False) or has_unusual_symbols(text)
+        ):
             return []
 
         return [
             AtsIssue(
                 rule="unusual_symbols",
                 message="The resume contains unusual or potentially unparseable characters.",
-                fix="Replace unusual symbols with standard text characters and verify the extracted resume text.",
+                fix=(
+                    "Replace unusual symbols with standard text characters"
+                    " and verify the extracted resume text."
+                ),
                 penalty=PENALTIES["unusual_symbols"],
             )
         ]
