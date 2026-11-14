@@ -2,7 +2,9 @@
 
 Milestone: Nov 2 to 8, 2026, FR-4 to FR-8 ([design-report.md](design-report.md)).
 Endpoint shapes: [api-contract.md](api-contract.md).
-Last updated Nov 4. Frontend implementation is prepared; local verification and PR review are pending.
+
+Last updated Nov 14. Week 3 frontend implementation and live testing are
+complete. Upload page cleanup is in progress.
 
 ## Checklist
 
@@ -16,16 +18,16 @@ Last updated Nov 4. Frontend implementation is prepared; local verification and 
 - [x] Handle expired sessions and clear parsed content on logout or account deletion
 - [x] Add responsive styling for desktop and mobile widths
 - [x] Lint and mocked frontend behavior checks pass
-- [ ] Verify the layout in a browser at desktop and mobile widths
-- [ ] Test PDF and DOCX uploads against the running backend and database
-- [ ] Push `feature/upload-page` and open a pull request
-- [ ] Teammate review and merge
+- [x] Verify the layout in a browser at desktop and mobile widths
+- [x] Test PDF and DOCX uploads against the running backend and database
+- [x] Push `feature/upload-page` and open a pull request
+- [x] Teammate review and merge
 
 ## Pull requests
 
 | PR | Branch | State |
 | --- | --- | --- |
-| Not opened | `feature/upload-page` | Preparing changes and local verification. |
+| [#11](https://github.com/dy1an-nt/603-Team-16-Capstone-Project/pull/11) | `feature/upload-page` | Merged. Lead verified PDF/DOCX uploads and upload error messages on PostgreSQL. |
 
 ## Review note
 
@@ -37,18 +39,14 @@ Mocked frontend checks covered successful upload, missing sections,
 text-only rendering, 413/415/400/401 errors, duplicate submissions, and
 logout during an upload.
 
-Browser layout and live database-backed uploads still need verification.
-No pull request has been opened or reviewed.
+Live PDF/DOCX uploads, parsed sections, 413/415/400 messages, logout/login,
+and desktop/mobile layouts passed verification on Nov 9. The lead also
+confirmed live upload testing on PostgreSQL. PR #11 was merged.
 
 ## Blockers
 
-- Local backend and database setup must be completed before testing live uploads.
-- Run `npm run setup` and configure `.env` according to `README.md`.
-- A real browser check is still required because browser installation failed
-  in the preparation environment.
-- Live upload testing returns "Upload failed. Check that the backend is
-  running and try again." Cause is undiagnosed. Upload and parsed-section
-  display still need successful end-to-end verification.
+- None for Week 3 upload functionality. The lead confirmed that the earlier
+  generic upload failure came from a local backend crash.
 
 ## Frontend handoff
 
@@ -66,6 +64,6 @@ No pull request has been opened or reviewed.
   size limit. No backend, database schema, or dependency changes are included.
 - Job description and Analyze controls remain disabled placeholders for
   later milestones. Upload now has its own action.
-
-## Next action (through Nov 8)
-
+- `window.currentResumeId` holds the ID returned after a successful upload.
+  It is `null` initially and clears on file selection, a new upload attempt,
+  logout, or account deletion. Coordinate this shared name with Emma.

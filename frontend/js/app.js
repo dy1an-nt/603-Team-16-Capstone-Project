@@ -66,11 +66,13 @@ const uploadButton = document.getElementById("upload-btn");
 const uploadStatus = document.getElementById("upload-status");
 const parsedResume = document.getElementById("parsed-resume");
 const parsedSections = document.getElementById("parsed-sections");
+window.currentResumeId = null;
 let uploading = false;
 // Invalidate in-flight results when the account changes.
 let uploadGeneration = 0;
 
 function clearParsedResume() {
+  window.currentResumeId = null;
   uploadGeneration += 1;
   parsedResume.hidden = true;
   parsedSections.replaceChildren();
@@ -124,14 +126,13 @@ function uploadError(error) {
       return "The resume could not be read. It may be empty, damaged, or an image-only scan. Export a text-based PDF or DOCX and try again.";
     case 401:
       return "Your session has expired. Log in again, then choose your resume to retry.";
-    case 501:
-      return "Resume upload is not available on this backend yet. Please try again after the backend is updated.";
     default:
       return "Upload failed. Check that the backend is running and try again.";
   }
 }
 
 fileInput.addEventListener("change", () => {
+  window.currentResumeId = null;
   parsedResume.hidden = true;
   parsedSections.replaceChildren();
   uploadStatus.className = "muted";
@@ -152,6 +153,7 @@ uploadForm.addEventListener("submit", async (event) => {
     uploadStatus.textContent = "Choose a resume file first.";
     return;
   }
+  window.currentResumeId = null;
   const generation = ++uploadGeneration;
   parsedResume.hidden = true;
   parsedSections.replaceChildren();
@@ -164,6 +166,7 @@ uploadForm.addEventListener("submit", async (event) => {
   try {
     const resume = await api.uploadResume(file);
     if (generation !== uploadGeneration || !api.isLoggedIn()) return;
+    window.currentResumeId = resume.id;
     renderSections(resume);
     message = "Resume uploaded and saved. Review the parsed sections below.";
   } catch (error) {
