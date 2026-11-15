@@ -3,8 +3,8 @@
 Milestone: Nov 2 to 8, 2026, FR-4 to FR-8 ([design-report.md](design-report.md)).
 Endpoint shapes: [api-contract.md](api-contract.md).
 
-Last updated Nov 14. Week 3 frontend implementation and live testing are
-complete. Upload page cleanup is in progress.
+Last updated Nov 15. Week 3 frontend implementation and live testing are
+complete. Upload page cleanup and the resume ID handoff are in PR #15.
 
 ## Checklist
 
@@ -66,4 +66,4 @@ confirmed live upload testing on PostgreSQL. PR #11 was merged.
   later milestones. Upload now has its own action.
 - `window.currentResumeId` holds the ID returned after a successful upload.
   It is `null` initially and clears on file selection, a new upload attempt,
-  logout, or account deletion. Coordinate this shared name with Emma.
+  logout, or account deletion.
