@@ -1,11 +1,11 @@
 :root {
-  --bg: #f7f7f8;
+  --bg: #f1f5f9;
   --surface: #ffffff;
-  --text: #1a1a1a;
-  --muted: #666;
-  --accent: #2563eb;
+  --text: #172b42;
+  --muted: #52647a;
+  --accent: #2158bc;
   --border: #e2e2e5;
-  --radius: 8px;
+  --radius: 12px;
 }
 
 * { box-sizing: border-box; }
@@ -30,8 +30,9 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 28px;
   margin-bottom: 16px;
+  box-shadow: 0 3px 14px #172b4205;
 }
 
 textarea {
@@ -50,31 +51,23 @@ button {
   padding: 10px 20px;
   font: inherit;
   cursor: pointer;
-  margin-bottom: 16px;
+  margin: 0;
+  font-weight: 600;
 }
 
 /* Account and resume upload */
-:root {
-  --bg: #f1f5f9;
-  --text: #172b42;
-  --muted: #52647a;
-  --accent: #2158bc;
-  --radius: 12px;
-}
 [hidden] { display: none !important; }
 .site-header { padding-top: 40px; padding-bottom: 24px; }
 h1 { font-size: clamp(2rem, 6vw, 2.8rem); letter-spacing: -.04em; margin: 8px 0; }
 h2 { margin: 0 0 12px; font-size: 1.35rem; }
 h3 { margin: 0 0 8px; font-size: 1rem; }
 .eyebrow { font-size: .75rem; letter-spacing: .12em; font-weight: 750; color: var(--accent); }
-.card { padding: 28px; box-shadow: 0 3px 14px #172b4205; }
 #auth-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 #auth-form p { margin: 0; grid-column: 1 / -1; }
 label { display: inline-block; font-weight: 600; margin-bottom: 6px; }
 input { width: 100%; padding: 12px; border: 1px solid #bcc9d8; border-radius: 8px; font: inherit; background: #fff; color: var(--text); }
 input[type="file"] { padding: 18px; background: #f8fafc; margin: 0 0 18px; }
 input::file-selector-button { font: inherit; border: 1px solid #bcc9d8; border-radius: 6px; background: #fff; padding: 8px 12px; margin-right: 12px; cursor: pointer; }
-button { margin: 0; font-weight: 600; }
 button:hover:not(:disabled) { filter: brightness(.93); }
 button:disabled { cursor: not-allowed; opacity: .6; }
 .secondary { background: #e8effb; color: #1c4c9e; }
