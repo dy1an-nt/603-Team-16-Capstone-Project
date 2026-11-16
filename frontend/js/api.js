@@ -62,4 +62,16 @@ const api = {
     form.append("file", file);
     return apiRequest("/resumes", { method: "POST", body: form });
   },
+  //send saved resume id and optional job description for analysis
+  createAnalysis: (resumeId, jobDescription) => {
+    const body = {resume_id: resumeId};
+    if (jobDescription && jobDescription.trim()) { //add job description only when contains text.
+      body.job_description = jobDescription.trim();
+    }
+    return apiRequest("/analyses", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"} ,
+      body: JSON.stringify(body),
+    });
+  },
 };
