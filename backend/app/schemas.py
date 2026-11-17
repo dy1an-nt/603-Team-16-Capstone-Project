@@ -61,6 +61,19 @@ class JobRequirements(BaseModel):
     preferred_skills: list[str] = []
     responsibilities: list[str] = []
 
+    @field_validator("required_skills", "preferred_skills", "responsibilities")
+    @classmethod
+    def drop_blank_and_duplicate(cls, v: list[str]) -> list[str]:
+        # A blank skill would match every resume in match_scorer.
+        seen: set[str] = set()
+        cleaned = []
+        for item in v:
+            text = item.strip()
+            if text and text.lower() not in seen:
+                seen.add(text.lower())
+                cleaned.append(text)
+        return cleaned
+
 
 # ---------- Analyses (FR-9 to FR-13, FR-20) ----------
 NonBlankText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
