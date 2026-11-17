@@ -62,10 +62,11 @@
       <p class="muted" id="analysis-help">Job matching and scoring will be available in a later milestone.</p>
       <label for="job-text">Job posting</label>
       <textarea disabled id="job-text" rows="8" placeholder="Paste the job description"></textarea>
+      <!-- NFR-13: privacy notice shown before analysis -->
+      <p id="analysis-privacy-notice" class="muted">
+        If you add a job description, your resume text and the job description are sent to a third-party AI service. ATS-only analysis stays on our server.
+      </p>
     </section>
-    <p id="analysis-privacy-notice" class="muted"> <!-- NFR-13: privacy notice shown before analysis -->
-      Resume text will be sent to a third-party LLM/AI-assisted service.
-    </p>
 
     <button id="analyze-btn" type="button" disabled aria-describedby="analysis-help">Analyze</button>
 

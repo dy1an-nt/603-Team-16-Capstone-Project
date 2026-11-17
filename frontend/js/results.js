@@ -1,5 +1,10 @@
 // To handle job analysis and display results
 
+// Bumped whenever the current resume changes, so a response for an older
+// resume or account is dropped instead of rendered.
+let analysisGeneration = 0;
+let analysisResumeId = null;
+let analyzing = false;
 
 //read job description box
 function getJobDescription() {
@@ -8,8 +13,9 @@ function getJobDescription() {
 }
 
 //send text from job description box to mock analysis when enabled, otherwise request real analysis
-async function requestAnalysis(resumeId, jobDescription = getJobDescription()) {
-    if (mockAnalysis.enabled === true) {
+async function requestAnalysis(resumeId, jobDescription) {
+    // mock-analysis.js is temporary, so do not fail when it has been removed.
+    if (typeof mockAnalysis !== "undefined" && mockAnalysis.enabled === true) {
         return await mockAnalysis.create(resumeId, jobDescription);
     }
     return await api.createAnalysis(resumeId, jobDescription);
@@ -26,7 +32,7 @@ function displayAnalysis(analysis) {
     atsScore.textContent = `ATS score: ${analysis.ats_score}/100`;
     resultsBody.append(atsScore);
 
-    if (analysis.match_score !== null) { //if analysis contains job match score, show it 
+    if (typeof analysis.match_score === "number") { //if analysis contains job match score, show it
         const matchScore = document.createElement("h3");
         matchScore.textContent = `Job match score: ${analysis.match_score}/100`;
         resultsBody.append(matchScore);
@@ -65,19 +71,32 @@ function displayAnalysis(analysis) {
     resultsSection.hidden = false;
 }
 
-//get mock analysis results, display them or show error
-async function runAnalysis(resumeId, jobDescription = getJobDescription()) {
+//get analysis results, display them or show error
+async function runAnalysis(resumeId, jobDescription) {
+    if (analyzing) return; //one request at a time, so double clicks do not save duplicates
+
     const resultsSection = document.getElementById("results");
     const resultsBody = document.getElementById("results-body");
+    const generation = analysisGeneration;
 
+    analyzing = true;
+    updateAnalysisControls();
     resultsSection.hidden = false;
     resultsBody.textContent = "Analysing..."; //show while waiting for results
 
     try {
         const analysis = await requestAnalysis(resumeId, jobDescription);
+        if (generation !== analysisGeneration) return;
         displayAnalysis(analysis);
     } catch (error) {
+        if (generation !== analysisGeneration) return;
         displayAnalysisError(error, resumeId, jobDescription);
+    } finally {
+        // A resume change already reset `analyzing` and may have started a newer request.
+        if (generation === analysisGeneration) {
+            analyzing = false;
+            updateAnalysisControls();
+        }
     }
 }
 
@@ -85,6 +104,11 @@ async function runAnalysis(resumeId, jobDescription = getJobDescription()) {
 function displayAnalysisError(error, resumeId, jobDescription) {
     const resultsBody = document.getElementById("results-body");
     resultsBody.replaceChildren(); //clear prev results
+
+    if (error.status === 401) { //token is already cleared by api.js, so return to login
+        renderAccount("Your session has expired. Log in again to run the analysis.");
+        return;
+    }
 
     const message = document.createElement("p");
     message.textContent = error.message;
@@ -94,33 +118,14 @@ function displayAnalysisError(error, resumeId, jobDescription) {
         const retryButton = document.createElement("button");
         retryButton.type = "button";
         retryButton.textContent = "Retry";
-
-        retryButton.addEventListener("click", () => {
-            const currentResumeId = window.currentResumeId;
-
-            if (currentResumeId === null) {
-                resultsBody.textContent = "Upload a resume first.";
-                return;
-            }
-
-            runAnalysis(currentResumeId, jobDescription);
-        });
+        // Retry the same resume the failed request used.
+        retryButton.addEventListener("click", () => runAnalysis(resumeId, jobDescription));
 
         const atsOnlyButton = document.createElement("button");
         atsOnlyButton.type = "button";
         atsOnlyButton.textContent = "ATS score only"; //only ATS
         atsOnlyButton.style.marginLeft = "8px";
-
-        atsOnlyButton.addEventListener("click", () => {
-            const currentResumeId = window.currentResumeId;
-
-            if (currentResumeId === null) {
-                resultsBody.textContent = "Upload a resume first.";
-                return;
-            }
-
-            runAnalysis(currentResumeId, "");
-        });
+        atsOnlyButton.addEventListener("click", () => runAnalysis(resumeId, ""));
 
         resultsBody.append(retryButton, atsOnlyButton);
     }
@@ -128,13 +133,23 @@ function displayAnalysisError(error, resumeId, jobDescription) {
 
 // once a resume has been uploaded, enable analysis
 function updateAnalysisControls() {
-    const hasResume = Number.isInteger(window.currentResumeId);
+    const resumeId = window.currentResumeId;
+    const hasResume = Number.isInteger(resumeId);
     const jobInput = document.getElementById("job-text");
     const analyzeButton = document.getElementById("analyze-btn");
     const analysisHelp = document.getElementById("analysis-help");
 
+    if (resumeId !== analysisResumeId) { //new upload, logout, or account deletion
+        analysisResumeId = resumeId;
+        analysisGeneration += 1;
+        analyzing = false;
+        document.getElementById("results-body").replaceChildren();
+        document.getElementById("results").hidden = true;
+    }
+
     jobInput.disabled = !hasResume;
-    analyzeButton.disabled = !hasResume;
+    analyzeButton.disabled = !hasResume || analyzing;
+    analyzeButton.textContent = analyzing ? "Analysing..." : "Analyze";
 
     analysisHelp.textContent = hasResume
         ? "Paste a job description for matching, or leave it blank for ATS-only analysis."
@@ -142,7 +157,6 @@ function updateAnalysisControls() {
 
     if (!hasResume) {
         jobInput.value = ""; //empty the box when there is no current resume/choosing a new file/logging out
-        document.getElementById("results").hidden = true;
     }
 }
 
@@ -161,11 +175,11 @@ updateAnalysisControls();
 document.getElementById("analyze-btn").addEventListener("click", () => {
     const resumeId = window.currentResumeId;
 
-    if (resumeId === null) {
+    if (!Number.isInteger(resumeId)) {
         document.getElementById("results").hidden = false;
         document.getElementById("results-body").textContent = "Upload a resume first.";
         return;
     }
 
-    runAnalysis(resumeId);
+    runAnalysis(resumeId, getJobDescription());
 });

@@ -62,11 +62,11 @@ const api = {
     form.append("file", file);
     return apiRequest("/resumes", { method: "POST", body: form });
   },
-  //send saved resume id and optional job description for analysis
+  //send saved resume id and optional job description for analysis. Callers pass trimmed text.
   createAnalysis: (resumeId, jobDescription) => {
     const body = {resume_id: resumeId};
-    if (jobDescription && jobDescription.trim()) { //add job description only when contains text.
-      body.job_description = jobDescription.trim();
+    if (jobDescription) { //add job description only when it contains text
+      body.job_description = jobDescription;
     }
     return apiRequest("/analyses", {
       method: "POST",
