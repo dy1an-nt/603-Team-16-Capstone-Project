@@ -195,6 +195,8 @@ non-obvious pitfall, add one line here in the same pull request.
   defaults silently.
 - `db/schema.sql` only creates missing tables. Edits to an existing table
   need an `ALTER TABLE` statement shared with the team (section 6, item 5).
+  Those live in `db/migrations/` and are applied by hand. A 500 with
+  `UndefinedColumn` in the backend log means one was never run locally.
 - `frontend/js/api.js` hardcodes `API_BASE = "http://localhost:8000"`. The
   report's deploy plan changes it to a relative path. Do not add a second
   base URL anywhere.
