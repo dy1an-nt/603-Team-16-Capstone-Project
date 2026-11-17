@@ -81,7 +81,7 @@ async function runAnalysis(resumeId, jobDescription = getJobDescription()) {
     }
 }
 
-// dislay analysis results, display them or show error
+// display analysis errors and recovery options for a 502 response.
 function displayAnalysisError(error, resumeId, jobDescription) {
     const resultsBody = document.getElementById("results-body");
     resultsBody.replaceChildren(); //clear prev results
@@ -96,7 +96,14 @@ function displayAnalysisError(error, resumeId, jobDescription) {
         retryButton.textContent = "Retry";
 
         retryButton.addEventListener("click", () => {
-            runAnalysis(resumeId, jobDescription); //retry with same resume and description
+            const currentResumeId = window.currentResumeId;
+
+            if (currentResumeId === null) {
+                resultsBody.textContent = "Upload a resume first.";
+                return;
+            }
+
+            runAnalysis(currentResumeId, jobDescription);
         });
 
         const atsOnlyButton = document.createElement("button");
@@ -105,9 +112,60 @@ function displayAnalysisError(error, resumeId, jobDescription) {
         atsOnlyButton.style.marginLeft = "8px";
 
         atsOnlyButton.addEventListener("click", () => {
-            runAnalysis(resumeId, "");
+            const currentResumeId = window.currentResumeId;
+
+            if (currentResumeId === null) {
+                resultsBody.textContent = "Upload a resume first.";
+                return;
+            }
+
+            runAnalysis(currentResumeId, "");
         });
 
         resultsBody.append(retryButton, atsOnlyButton);
     }
 }
+
+// once a resume has been uploaded, enable analysis
+function updateAnalysisControls() {
+    const hasResume = Number.isInteger(window.currentResumeId);
+    const jobInput = document.getElementById("job-text");
+    const analyzeButton = document.getElementById("analyze-btn");
+    const analysisHelp = document.getElementById("analysis-help");
+
+    jobInput.disabled = !hasResume;
+    analyzeButton.disabled = !hasResume;
+
+    analysisHelp.textContent = hasResume
+        ? "Paste a job description for matching, or leave it blank for ATS-only analysis."
+        : "Upload a resume first to enable analysis.";
+
+    if (!hasResume) {
+        jobInput.value = ""; //empty the box when there is no current resume/choosing a new file/logging out
+        document.getElementById("results").hidden = true;
+    }
+}
+
+// update analysis controls when the resume section is shown or hidden
+const resumeStateObserver = new MutationObserver(updateAnalysisControls);
+
+resumeStateObserver.observe(document.getElementById("parsed-resume"), {
+    attributes: true,
+    attributeFilter: ["hidden"],
+});
+
+updateAnalysisControls();
+
+
+//run analysis using the currently uploaded resume
+document.getElementById("analyze-btn").addEventListener("click", () => {
+    const resumeId = window.currentResumeId;
+
+    if (resumeId === null) {
+        document.getElementById("results").hidden = false;
+        document.getElementById("results-body").textContent = "Upload a resume first.";
+        return;
+    }
+
+    runAnalysis(resumeId);
+});
