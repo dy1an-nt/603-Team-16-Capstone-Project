@@ -62,6 +62,10 @@
       <p class="muted" id="analysis-help">Job matching and scoring will be available in a later milestone.</p>
       <label for="job-text">Job posting</label>
       <textarea disabled id="job-text" rows="8" placeholder="Paste the job description"></textarea>
+      <!-- NFR-13: privacy notice shown before analysis -->
+      <p id="analysis-privacy-notice" class="muted">
+        If you add a job description, your resume text and the job description are sent to a third-party AI service. ATS-only analysis stays on our server.
+      </p>
     </section>
 
     <button id="analyze-btn" type="button" disabled aria-describedby="analysis-help">Analyze</button>
@@ -74,5 +78,8 @@
 
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/mock-analysis.js"></script>
+  <script src="js/results.js"></script>
 </body>
+
 </html>
