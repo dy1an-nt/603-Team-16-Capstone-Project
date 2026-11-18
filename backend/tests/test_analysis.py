@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.main import api, app
 from app.repositories import ResumeRepository
-from app.services import llm
+from app.services import llm, semantic_scorer
 
 TEST_DB = os.environ.get("TEST_DATABASE_URL")
 SCHEMA = Path(__file__).resolve().parents[2] / "db" / "schema.sql"
@@ -59,11 +59,22 @@ def client(monkeypatch):
         "test-secret-at-least-32-bytes-long-0123",
     )
 
+    # Use a lightweight fake model for automated tests.
+    monkeypatch.setattr(
+        semantic_scorer,
+        "load_model",
+        lambda: object(),
+    )
+
     with psycopg.connect(TEST_DB) as conn:
         conn.execute("TRUNCATE users RESTART IDENTITY CASCADE")
 
     api.dependency_overrides[get_db] = _test_db
-    yield TestClient(app)
+
+    # Run the FastAPI lifespan so application startup initializes the model.
+    with TestClient(app) as test_client:
+        yield test_client
+
     api.dependency_overrides.clear()
 
 
@@ -198,7 +209,14 @@ def job_description_count() -> int:
         return conn.execute("SELECT count(*) FROM job_descriptions").fetchone()[0]
 
 
-def test_job_description_analysis_returns_match_score(client):
+def test_job_description_analysis_returns_match_score(client, monkeypatch):
+    # Force semantic similarity to 0 for this test.
+    monkeypatch.setattr(
+        semantic_scorer,
+        "score",
+        lambda model, resume_text, job_description: 0.0,
+    )
+
     fake = use_llm(FakeLLM(JOB_JSON))
     user = register(client)
     resume_id = create_resume(user["id"])
@@ -206,7 +224,10 @@ def test_job_description_analysis_returns_match_score(client):
     response = client.post(
         "/analyses",
         headers=login(client),
-        json={"resume_id": resume_id, "job_description": "Software Engineer. Python, SQL, Docker."},
+        json={
+            "resume_id": resume_id,
+            "job_description": "Software Engineer. Python, SQL, Docker.",
+        },
     )
 
     assert response.status_code == 201, response.text

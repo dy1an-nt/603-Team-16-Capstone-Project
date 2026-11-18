@@ -4,13 +4,13 @@ import logging
 from typing import Annotated
 
 import psycopg
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.db import get_db
 from app.repositories import AnalysisRepository, JobDescriptionRepository, ResumeRepository
 from app.schemas import AnalysisCreate, AnalysisOut, RevisionOut
 from app.security import CurrentUser, get_current_user
-from app.services import ats_scorer, llm, match_scorer
+from app.services import ats_scorer, llm, match_scorer, semantic_scorer
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ Llm = Annotated[llm.LLMClient, Depends(llm.get_llm_client)]
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=AnalysisOut)
 def create_analysis(
     body: AnalysisCreate,
+    request: Request,
     user: CurrentUser,
     conn: Db,
     llm_client: Llm,
@@ -67,7 +68,19 @@ def create_analysis(
         )
         if job_description_id is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Resume not found.")
-        match_score, report = match_scorer.score(resume["raw_text"], job)
+        semantic_model = request.app.state.semantic_model
+
+        semantic_score = semantic_scorer.score(
+            semantic_model,
+            resume["raw_text"],
+            body.job_description,
+        )
+
+        match_score, report = match_scorer.score(
+            resume["raw_text"],
+            job,
+            semantic=semantic_score,
+        )
         keywords = report.model_dump()
 
     repository = AnalysisRepository(conn)
@@ -95,8 +108,23 @@ def create_analysis(
 
 
 @router.get("/{analysis_id}", response_model=AnalysisOut)
-def get_analysis(analysis_id: int):
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "get not implemented")
+def get_analysis(
+    analysis_id: int,
+    user: CurrentUser,
+    conn: Db,
+):
+    analysis = AnalysisRepository(conn).get(
+        user["id"],
+        analysis_id,
+    )
+
+    if analysis is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Analysis not found.",
+        )
+
+    return analysis
 
 
 @router.post(
@@ -107,3 +135,4 @@ def get_analysis(analysis_id: int):
 def create_revision(analysis_id: int):
     # TODO(Week 6): llm.generate_suggestions(), grounding.flag(), save
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "revision not implemented")
+
