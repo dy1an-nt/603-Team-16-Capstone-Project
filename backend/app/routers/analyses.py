@@ -7,10 +7,15 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.db import get_db
-from app.repositories import AnalysisRepository, JobDescriptionRepository, ResumeRepository
-from app.schemas import AnalysisCreate, AnalysisOut, RevisionOut
+from app.repositories import (
+    AnalysisRepository,
+    JobDescriptionRepository,
+    ResumeRepository,
+    RevisionRepository,
+)
+from app.schemas import AnalysisCreate, AnalysisOut, JobRequirements, RevisionOut
 from app.security import CurrentUser, get_current_user
-from app.services import ats_scorer, llm, match_scorer
+from app.services import ats_scorer, llm, match_scorer, reviser
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +109,46 @@ def get_analysis(analysis_id: int):
     status_code=status.HTTP_201_CREATED,
     response_model=RevisionOut,
 )
-def create_revision(analysis_id: int):
-    # TODO(Week 6): llm.generate_suggestions(), grounding.flag(), save
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "revision not implemented")
+def create_revision(
+    analysis_id: int,
+    user: CurrentUser,
+    conn: Db,
+    llm_client: Llm,
+):
+    analysis = AnalysisRepository(conn).get(user["id"], analysis_id)
+    if analysis is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Analysis not found.")
+    resume = ResumeRepository(conn).get(user["id"], analysis["resume_id"])
+    if resume is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Analysis not found.")
+
+    job = None
+    skills: list[str] = []
+    missing: list[str] = []
+    if analysis["job_requirements"] is not None:
+        job = JobRequirements.model_validate(analysis["job_requirements"])
+        skills = job.required_skills + job.preferred_skills
+        missing = (analysis["keywords"] or {}).get("missing", [])
+
+    # A resume with no summary, experience, or projects text has nothing to rewrite.
+    suggestions = []
+    if any(resume["sections"].get(name) for name in llm.REVISABLE_SECTIONS):
+        try:
+            drafts = llm.generate_suggestions(llm_client, resume["sections"], job, missing)
+        except llm.LLMError as exc:
+            logger.warning("Revision suggestions failed: %s", exc)
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                "Could not generate suggestions. Try again.",
+            ) from exc
+        suggestions = reviser.prepare(
+            drafts.suggestions, resume["raw_text"], resume["sections"], skills
+        )
+
+    repository = RevisionRepository(conn)
+    revision_id = repository.create(
+        user["id"], analysis_id, [s.model_dump() for s in suggestions]
+    )
+    if revision_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Analysis not found.")
+    return repository.get(user["id"], revision_id)
