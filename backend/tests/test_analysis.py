@@ -63,8 +63,9 @@ def client(monkeypatch):
         conn.execute("TRUNCATE users RESTART IDENTITY CASCADE")
 
     api.dependency_overrides[get_db] = _test_db
-    # Stands in for the embedding model. Tests set the score they need.
+    # Stands in for the embedding model. S is 0 unless a test calls use_semantic.
     api.dependency_overrides[semantic_scorer.get_model] = lambda: object()
+    use_semantic(monkeypatch, 0.0)
     yield TestClient(app)
     api.dependency_overrides.clear()
 
@@ -172,7 +173,7 @@ class FakeLLM:
         self.replies = list(replies)
         self.calls = 0
 
-    def complete_json(self, system, user, temperature):
+    def complete_json(self, system, user, temperature, reasoning_effort):
         self.calls += 1
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
@@ -204,8 +205,7 @@ def use_semantic(monkeypatch, value: float):
     monkeypatch.setattr(semantic_scorer, "score", lambda model, resume, job: value)
 
 
-def test_job_description_analysis_returns_match_score(client, monkeypatch):
-    use_semantic(monkeypatch, 0.0)
+def test_job_description_analysis_returns_match_score(client):
     fake = use_llm(FakeLLM(JOB_JSON))
     user = register(client)
     resume_id = create_resume(user["id"])
@@ -371,6 +371,51 @@ def create_ats_analysis(client, user_id: int, headers) -> dict:
     return response.json()
 
 
+# ---------- Revisions (FR-14 to FR-18) ----------
+SUGGESTIONS_JSON = json.dumps(
+    {
+        "suggestions": [
+            {
+                "section": "experience",
+                "original": "Software Engineer",
+                "revised": "Software Engineer building Python services",
+                "reason": "Names the main language.",
+                "keywords_added": [],
+            },
+            {
+                "section": "experience",
+                "original": "Software Engineer",
+                "revised": "Software Engineer shipping Docker containers",
+                "reason": "Adds Docker, a required skill.",
+                "keywords_added": ["Docker"],
+            },
+            {
+                "section": "experience",
+                "original": "Senior Architect",
+                "revised": "Principal Architect",
+                "reason": "Not in the resume, so it is dropped.",
+                "keywords_added": [],
+            },
+        ]
+    }
+)
+
+
+def revision_count() -> int:
+    with psycopg.connect(TEST_DB) as conn:
+        return conn.execute("SELECT count(*) FROM revisions").fetchone()[0]
+
+
+def create_job_analysis(client, headers, resume_id):
+    response = client.post(
+        "/analyses",
+        headers=headers,
+        json={"resume_id": resume_id, "job_description": "Software Engineer. Python, SQL, Docker."},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 def test_get_analysis_returns_saved_analysis(client):
     user = register(client)
     headers = login(client)
@@ -404,3 +449,159 @@ def test_get_analysis_requires_authentication(client):
     response = client.get("/analyses/1")
 
     assert response.status_code == 401
+
+
+def test_create_revision_returns_flagged_suggestions(client):
+    fake = use_llm(FakeLLM(JOB_JSON, SUGGESTIONS_JSON))
+    user = register(client)
+    headers = login(client)
+    analysis = create_job_analysis(client, headers, create_resume(user["id"]))
+
+    response = client.post(f"/analyses/{analysis['id']}/revisions", headers=headers)
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert fake.calls == 2
+    assert len(body["suggestions"]) == 2
+    first, second = body["suggestions"]
+    assert first["flagged"] is False and first["accepted"] is None
+    assert second["flagged"] is True
+    assert "new skill: Docker" in second["flag_reasons"]
+    assert body["original_match_score"] == 43
+    assert body["new_match_score"] is None
+    assert body["revised_text"] is None
+
+
+def test_accepting_a_suggestion_rebuilds_text_and_rescores(client):
+    use_llm(FakeLLM(JOB_JSON, SUGGESTIONS_JSON))
+    user = register(client)
+    headers = login(client)
+    analysis = create_job_analysis(client, headers, create_resume(user["id"]))
+    revision = client.post(f"/analyses/{analysis['id']}/revisions", headers=headers).json()
+
+    response = client.patch(
+        f"/revisions/{revision['id']}",
+        headers=headers,
+        json={"decisions": [{"index": 1, "accepted": True}, {"index": 0, "accepted": False}]},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [s["accepted"] for s in body["suggestions"]] == [False, True]
+    assert "Software Engineer shipping Docker containers" in body["revised_text"]
+    # Docker is now present: R=3/3, P=0, T=1 -> 100*(0.5 + 0.1) = 60
+    assert body["original_match_score"] == 43
+    assert body["new_match_score"] == 60
+
+
+def test_patch_rejects_index_outside_suggestions(client):
+    use_llm(FakeLLM(JOB_JSON, SUGGESTIONS_JSON))
+    user = register(client)
+    headers = login(client)
+    analysis = create_job_analysis(client, headers, create_resume(user["id"]))
+    revision = client.post(f"/analyses/{analysis['id']}/revisions", headers=headers).json()
+
+    response = client.patch(
+        f"/revisions/{revision['id']}",
+        headers=headers,
+        json={"decisions": [{"index": 5, "accepted": True}]},
+    )
+
+    assert response.status_code == 400
+
+
+def test_revision_saves_nothing_when_llm_fails(client):
+    use_llm(FakeLLM(JOB_JSON, "not json", "still not json"))
+    user = register(client)
+    headers = login(client)
+    analysis = create_job_analysis(client, headers, create_resume(user["id"]))
+
+    response = client.post(f"/analyses/{analysis['id']}/revisions", headers=headers)
+
+    assert response.status_code == 502
+    assert revision_count() == 0
+
+
+def test_revision_for_ats_only_analysis_has_no_scores(client):
+    fake = use_llm(FakeLLM(SUGGESTIONS_JSON))
+    user = register(client)
+    headers = login(client)
+    resume_id = create_resume(user["id"])
+    analysis = client.post("/analyses", headers=headers, json={"resume_id": resume_id}).json()
+
+    revision = client.post(f"/analyses/{analysis['id']}/revisions", headers=headers).json()
+    response = client.patch(
+        f"/revisions/{revision['id']}",
+        headers=headers,
+        json={"decisions": [{"index": 0, "accepted": True}]},
+    )
+
+    assert fake.calls == 1
+    assert revision["original_match_score"] is None
+    body = response.json()
+    assert body["new_match_score"] is None
+    assert "Software Engineer building Python services" in body["revised_text"]
+
+
+def test_revisions_hide_another_users_records(client):
+    fake = use_llm(FakeLLM(JOB_JSON, SUGGESTIONS_JSON))
+    ann = register(client)
+    register(client, BOB)
+    ann_headers = login(client)
+    bob_headers = login(client, BOB)
+    analysis = create_job_analysis(client, ann_headers, create_resume(ann["id"]))
+    revision = client.post(f"/analyses/{analysis['id']}/revisions", headers=ann_headers).json()
+
+    create = client.post(f"/analyses/{analysis['id']}/revisions", headers=bob_headers)
+    patch = client.patch(
+        f"/revisions/{revision['id']}",
+        headers=bob_headers,
+        json={"decisions": [{"index": 0, "accepted": True}]},
+    )
+
+    assert create.status_code == 404
+    assert patch.status_code == 404
+    assert fake.calls == 2
+    assert revision_count() == 1
+
+
+def test_rescore_includes_semantic_score(client, monkeypatch):
+    use_semantic(monkeypatch, 0.5)
+    use_llm(FakeLLM(JOB_JSON, SUGGESTIONS_JSON))
+    user = register(client)
+    headers = login(client)
+    analysis = create_job_analysis(client, headers, create_resume(user["id"]))
+    revision = client.post(f"/analyses/{analysis['id']}/revisions", headers=headers).json()
+
+    response = client.patch(
+        f"/revisions/{revision['id']}",
+        headers=headers,
+        json={"decisions": [{"index": 1, "accepted": True}]},
+    )
+
+    assert response.status_code == 200, response.text
+    # S=0.5 adds 10 points to both scores, so only the Docker edit moves the score.
+    assert response.json()["original_match_score"] == 53
+    assert response.json()["new_match_score"] == 70
+
+
+def test_rescore_returns_503_without_model(client):
+    use_llm(FakeLLM(JOB_JSON, SUGGESTIONS_JSON))
+    user = register(client)
+    headers = login(client)
+    analysis = create_job_analysis(client, headers, create_resume(user["id"]))
+    revision = client.post(f"/analyses/{analysis['id']}/revisions", headers=headers).json()
+    api.dependency_overrides[semantic_scorer.get_model] = lambda: None
+
+    response = client.patch(
+        f"/revisions/{revision['id']}",
+        headers=headers,
+        json={"decisions": [{"index": 1, "accepted": True}]},
+    )
+
+    assert response.status_code == 503
+    with psycopg.connect(TEST_DB) as conn:
+        saved = conn.execute(
+            "SELECT revised_text FROM revisions WHERE id = %s", (revision["id"],)
+        ).fetchone()
+    assert saved[0] is None

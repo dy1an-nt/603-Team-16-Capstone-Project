@@ -168,10 +168,11 @@ class AnalysisRepository:
         return row["id"] if row else None
 
     def get(self, user_id: int, analysis_id: int) -> dict | None:
-        """Shaped like schemas.AnalysisOut."""
+        """Shaped like schemas.AnalysisOut, plus job_text, which the re-score needs."""
         row = self.conn.execute(
             "SELECT a.id, a.resume_id, a.job_description_id, a.ats_score, a.issues,"
-            " j.extracted AS job_requirements, a.match_score, a.keywords, a.created_at"
+            " j.extracted AS job_requirements, j.raw_text AS job_text,"
+            " a.match_score, a.keywords, a.created_at"
             " FROM analyses a"
             " JOIN resumes r ON r.id = a.resume_id"
             " LEFT JOIN job_descriptions j ON j.id = a.job_description_id"
