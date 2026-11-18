@@ -59,22 +59,13 @@ def client(monkeypatch):
         "test-secret-at-least-32-bytes-long-0123",
     )
 
-    # Use a lightweight fake model for automated tests.
-    monkeypatch.setattr(
-        semantic_scorer,
-        "load_model",
-        lambda: object(),
-    )
-
     with psycopg.connect(TEST_DB) as conn:
         conn.execute("TRUNCATE users RESTART IDENTITY CASCADE")
 
     api.dependency_overrides[get_db] = _test_db
-
-    # Run the FastAPI lifespan so application startup initializes the model.
-    with TestClient(app) as test_client:
-        yield test_client
-
+    # Stands in for the embedding model. Tests set the score they need.
+    api.dependency_overrides[semantic_scorer.get_model] = lambda: object()
+    yield TestClient(app)
     api.dependency_overrides.clear()
 
 
@@ -209,14 +200,12 @@ def job_description_count() -> int:
         return conn.execute("SELECT count(*) FROM job_descriptions").fetchone()[0]
 
 
-def test_job_description_analysis_returns_match_score(client, monkeypatch):
-    # Force semantic similarity to 0 for this test.
-    monkeypatch.setattr(
-        semantic_scorer,
-        "score",
-        lambda model, resume_text, job_description: 0.0,
-    )
+def use_semantic(monkeypatch, value: float):
+    monkeypatch.setattr(semantic_scorer, "score", lambda model, resume, job: value)
 
+
+def test_job_description_analysis_returns_match_score(client, monkeypatch):
+    use_semantic(monkeypatch, 0.0)
     fake = use_llm(FakeLLM(JOB_JSON))
     user = register(client)
     resume_id = create_resume(user["id"])
@@ -326,3 +315,92 @@ def test_create_analysis_requires_authentication(client):
 
     assert response.status_code == 401
     assert analysis_count() == 0
+
+
+def test_job_description_analysis_adds_semantic_score(client, monkeypatch):
+    use_semantic(monkeypatch, 0.5)
+    use_llm(FakeLLM(JOB_JSON))
+    user = register(client)
+    resume_id = create_resume(user["id"])
+
+    response = client.post(
+        "/analyses",
+        headers=login(client),
+        json={"resume_id": resume_id, "job_description": "Software Engineer. Python."},
+    )
+
+    assert response.status_code == 201, response.text
+    # Same as the S=0 case above, plus 100 * 0.2 * 0.5 = 10.
+    assert response.json()["match_score"] == 53
+
+
+def test_job_description_analysis_returns_503_without_model(client):
+    api.dependency_overrides[semantic_scorer.get_model] = lambda: None
+    fake = use_llm(FakeLLM(JOB_JSON))
+    user = register(client)
+    resume_id = create_resume(user["id"])
+
+    response = client.post(
+        "/analyses",
+        headers=login(client),
+        json={"resume_id": resume_id, "job_description": "Software Engineer. Python."},
+    )
+
+    assert response.status_code == 503
+    assert "ATS-only" in response.json()["detail"]
+    assert fake.calls == 0
+    assert job_description_count() == 0
+    assert analysis_count() == 0
+
+
+def test_ats_only_analysis_works_without_model(client):
+    api.dependency_overrides[semantic_scorer.get_model] = lambda: None
+    user = register(client)
+    resume_id = create_resume(user["id"])
+
+    response = client.post("/analyses", headers=login(client), json={"resume_id": resume_id})
+
+    assert response.status_code == 201
+
+
+def create_ats_analysis(client, user_id: int, headers) -> dict:
+    response = client.post(
+        "/analyses", headers=headers, json={"resume_id": create_resume(user_id)}
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_get_analysis_returns_saved_analysis(client):
+    user = register(client)
+    headers = login(client)
+    created = create_ats_analysis(client, user["id"], headers)
+
+    response = client.get(f"/analyses/{created['id']}", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json() == created
+
+
+def test_get_analysis_missing_returns_404(client):
+    register(client)
+
+    response = client.get("/analyses/999999", headers=login(client))
+
+    assert response.status_code == 404
+
+
+def test_get_analysis_hides_another_users_analysis(client):
+    ann = register(client)
+    register(client, BOB)
+    created = create_ats_analysis(client, ann["id"], login(client))
+
+    response = client.get(f"/analyses/{created['id']}", headers=login(client, BOB))
+
+    assert response.status_code == 404
+
+
+def test_get_analysis_requires_authentication(client):
+    response = client.get("/analyses/1")
+
+    assert response.status_code == 401

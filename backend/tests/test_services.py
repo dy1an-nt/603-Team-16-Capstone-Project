@@ -1,10 +1,11 @@
 import base64
 from io import BytesIO
 
+import numpy as np
 from docx import Document
 
 from app.schemas import JobRequirements, Suggestion, SuggestionDraft
-from app.services import ats_scorer, grounding, match_scorer, parser
+from app.services import ats_scorer, grounding, match_scorer, parser, semantic_scorer
 
 RESUME = """Jane Doe
 jane@example.com
@@ -449,3 +450,59 @@ def test_pdf_header_footer_image_detection(monkeypatch):
 
     assert body_metadata["has_images"] is True
     assert body_metadata["has_header_footer_images"] is False
+
+
+class FakeEmbedder:
+    """Maps each chunk's first word to a fixed vector and records every call."""
+
+    VECTORS = {"python": [1.0, 0.0], "cooking": [0.0, 1.0], "anti": [-1.0, 0.0]}
+
+    def __init__(self):
+        self.calls = []
+
+    def encode(self, texts, normalize_embeddings):
+        self.calls.append(texts)
+        return np.array([self.VECTORS[t.split()[0].lower()] for t in texts])
+
+
+def test_semantic_score_identical_meaning_is_one():
+    assert semantic_scorer.score(FakeEmbedder(), "Python developer", "Python role") == 1.0
+
+
+def test_semantic_score_unrelated_is_zero():
+    assert semantic_scorer.score(FakeEmbedder(), "Python developer", "Cooking class") == 0.0
+
+
+def test_semantic_score_clamps_negative_similarity():
+    assert semantic_scorer.score(FakeEmbedder(), "Python developer", "Anti python") == 0.0
+
+
+def test_semantic_score_blank_text_skips_model():
+    model = FakeEmbedder()
+    assert semantic_scorer.score(model, "   ", "Python role") == 0.0
+    assert semantic_scorer.score(model, "Python developer", "") == 0.0
+    assert model.calls == []
+
+
+def test_semantic_score_reads_text_past_model_limit():
+    # The second chunk starts after CHUNK_WORDS words. It must still be embedded.
+    size = semantic_scorer.CHUNK_WORDS
+    resume = " ".join(["python"] * size + ["cooking"] * size)
+    model = FakeEmbedder()
+
+    similarity = semantic_scorer.score(model, resume, "cooking")
+
+    assert len(model.calls[0]) == 2
+    assert all(len(chunk.split()) <= size for chunk in model.calls[0])
+    # Mean of [1, 0] and [0, 1], normalized, against [0, 1].
+    assert round(similarity, 3) == 0.707
+
+
+def test_semantic_model_load_failure_returns_none(monkeypatch):
+    import sentence_transformers
+
+    def broken(name):
+        raise OSError("offline")
+
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", broken)
+    assert semantic_scorer.load_model() is None

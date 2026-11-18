@@ -7,7 +7,6 @@ from app.config import get_settings
 from app.routers import analyses, auth, resumes, revisions
 from app.services import semantic_scorer
 
-
 settings = get_settings()
 
 

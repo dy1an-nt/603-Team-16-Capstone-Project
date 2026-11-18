@@ -1,10 +1,10 @@
 """ATS scorer and job match: FR-9 to FR-13, FR-20."""
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 import psycopg
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.db import get_db
 from app.repositories import AnalysisRepository, JobDescriptionRepository, ResumeRepository
@@ -22,15 +22,16 @@ router = APIRouter(
 
 Db = Annotated[psycopg.Connection, Depends(get_db)]
 Llm = Annotated[llm.LLMClient, Depends(llm.get_llm_client)]
+SemanticModel = Annotated[Any | None, Depends(semantic_scorer.get_model)]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=AnalysisOut)
 def create_analysis(
     body: AnalysisCreate,
-    request: Request,
     user: CurrentUser,
     conn: Db,
     llm_client: Llm,
+    semantic_model: SemanticModel,
 ):
     # Retrieve the resume while enforcing ownership.
     resume = ResumeRepository(conn).get(user["id"], body.resume_id)
@@ -44,6 +45,11 @@ def create_analysis(
     # Extract job requirements before any write, so an LLM failure saves nothing.
     job = None
     if body.job_description is not None:
+        if semantic_model is None:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "Match scoring is unavailable. Try again later or run an ATS-only analysis.",
+            )
         try:
             job = llm.extract_job_requirements(llm_client, body.job_description)
         except llm.LLMError as exc:
@@ -68,19 +74,8 @@ def create_analysis(
         )
         if job_description_id is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Resume not found.")
-        semantic_model = request.app.state.semantic_model
-
-        semantic_score = semantic_scorer.score(
-            semantic_model,
-            resume["raw_text"],
-            body.job_description,
-        )
-
-        match_score, report = match_scorer.score(
-            resume["raw_text"],
-            job,
-            semantic=semantic_score,
-        )
+        semantic = semantic_scorer.score(semantic_model, resume["raw_text"], body.job_description)
+        match_score, report = match_scorer.score(resume["raw_text"], job, semantic=semantic)
         keywords = report.model_dump()
 
     repository = AnalysisRepository(conn)
@@ -135,4 +130,3 @@ def get_analysis(
 def create_revision(analysis_id: int):
     # TODO(Week 6): llm.generate_suggestions(), grounding.flag(), save
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "revision not implemented")
-
