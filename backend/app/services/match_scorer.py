@@ -4,12 +4,13 @@ Match = 100 * (0.5*R + 0.2*P + 0.1*T + 0.2*S)
   R = share of required skills found
   P = share of preferred skills found
   T = job title present (0 or 1)
-  S = embedding cosine similarity (added Week 5)
+  S = embedding cosine similarity (semantic_scorer)
 """
 
 import re
 
 from app.schemas import JobRequirements, KeywordReport
+from app.services import semantic_scorer
 
 WEIGHTS = {"required": 0.5, "preferred": 0.2, "title": 0.1, "semantic": 0.2}
 
@@ -61,3 +62,12 @@ def score(
         missing=req.missing + pref.missing,
     )
     return round(total), combined
+
+
+def score_with_model(
+    model, resume_text: str, job: JobRequirements, job_text: str
+) -> tuple[int, KeywordReport]:
+    """The full match score. The analysis and the revision re-score both call
+    this, so a re-score is comparable to the original."""
+    semantic = semantic_scorer.score(model, resume_text, job_text)
+    return score(resume_text, job, semantic=semantic)

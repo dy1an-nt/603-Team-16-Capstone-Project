@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.main import api, app
 from app.repositories import ResumeRepository
-from app.services import llm
+from app.services import llm, semantic_scorer
 
 TEST_DB = os.environ.get("TEST_DATABASE_URL")
 SCHEMA = Path(__file__).resolve().parents[2] / "db" / "schema.sql"
@@ -63,6 +63,9 @@ def client(monkeypatch):
         conn.execute("TRUNCATE users RESTART IDENTITY CASCADE")
 
     api.dependency_overrides[get_db] = _test_db
+    # Stands in for the embedding model. S is 0 unless a test calls use_semantic.
+    api.dependency_overrides[semantic_scorer.get_model] = lambda: object()
+    use_semantic(monkeypatch, 0.0)
     yield TestClient(app)
     api.dependency_overrides.clear()
 
@@ -198,6 +201,10 @@ def job_description_count() -> int:
         return conn.execute("SELECT count(*) FROM job_descriptions").fetchone()[0]
 
 
+def use_semantic(monkeypatch, value: float):
+    monkeypatch.setattr(semantic_scorer, "score", lambda model, resume, job: value)
+
+
 def test_job_description_analysis_returns_match_score(client):
     fake = use_llm(FakeLLM(JOB_JSON))
     user = register(client)
@@ -206,7 +213,10 @@ def test_job_description_analysis_returns_match_score(client):
     response = client.post(
         "/analyses",
         headers=login(client),
-        json={"resume_id": resume_id, "job_description": "Software Engineer. Python, SQL, Docker."},
+        json={
+            "resume_id": resume_id,
+            "job_description": "Software Engineer. Python, SQL, Docker.",
+        },
     )
 
     assert response.status_code == 201, response.text
@@ -307,6 +317,60 @@ def test_create_analysis_requires_authentication(client):
     assert analysis_count() == 0
 
 
+def test_job_description_analysis_adds_semantic_score(client, monkeypatch):
+    use_semantic(monkeypatch, 0.5)
+    use_llm(FakeLLM(JOB_JSON))
+    user = register(client)
+    resume_id = create_resume(user["id"])
+
+    response = client.post(
+        "/analyses",
+        headers=login(client),
+        json={"resume_id": resume_id, "job_description": "Software Engineer. Python."},
+    )
+
+    assert response.status_code == 201, response.text
+    # Same as the S=0 case above, plus 100 * 0.2 * 0.5 = 10.
+    assert response.json()["match_score"] == 53
+
+
+def test_job_description_analysis_returns_503_without_model(client):
+    api.dependency_overrides[semantic_scorer.get_model] = lambda: None
+    fake = use_llm(FakeLLM(JOB_JSON))
+    user = register(client)
+    resume_id = create_resume(user["id"])
+
+    response = client.post(
+        "/analyses",
+        headers=login(client),
+        json={"resume_id": resume_id, "job_description": "Software Engineer. Python."},
+    )
+
+    assert response.status_code == 503
+    assert "ATS-only" in response.json()["detail"]
+    assert fake.calls == 0
+    assert job_description_count() == 0
+    assert analysis_count() == 0
+
+
+def test_ats_only_analysis_works_without_model(client):
+    api.dependency_overrides[semantic_scorer.get_model] = lambda: None
+    user = register(client)
+    resume_id = create_resume(user["id"])
+
+    response = client.post("/analyses", headers=login(client), json={"resume_id": resume_id})
+
+    assert response.status_code == 201
+
+
+def create_ats_analysis(client, user_id: int, headers) -> dict:
+    response = client.post(
+        "/analyses", headers=headers, json={"resume_id": create_resume(user_id)}
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 # ---------- Revisions (FR-14 to FR-18) ----------
 SUGGESTIONS_JSON = json.dumps(
     {
@@ -350,6 +414,41 @@ def create_job_analysis(client, headers, resume_id):
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def test_get_analysis_returns_saved_analysis(client):
+    user = register(client)
+    headers = login(client)
+    created = create_ats_analysis(client, user["id"], headers)
+
+    response = client.get(f"/analyses/{created['id']}", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json() == created
+
+
+def test_get_analysis_missing_returns_404(client):
+    register(client)
+
+    response = client.get("/analyses/999999", headers=login(client))
+
+    assert response.status_code == 404
+
+
+def test_get_analysis_hides_another_users_analysis(client):
+    ann = register(client)
+    register(client, BOB)
+    created = create_ats_analysis(client, ann["id"], login(client))
+
+    response = client.get(f"/analyses/{created['id']}", headers=login(client, BOB))
+
+    assert response.status_code == 404
+
+
+def test_get_analysis_requires_authentication(client):
+    response = client.get("/analyses/1")
+
+    assert response.status_code == 401
 
 
 def test_create_revision_returns_flagged_suggestions(client):
@@ -464,3 +563,45 @@ def test_revisions_hide_another_users_records(client):
     assert patch.status_code == 404
     assert fake.calls == 2
     assert revision_count() == 1
+
+
+def test_rescore_includes_semantic_score(client, monkeypatch):
+    use_semantic(monkeypatch, 0.5)
+    use_llm(FakeLLM(JOB_JSON, SUGGESTIONS_JSON))
+    user = register(client)
+    headers = login(client)
+    analysis = create_job_analysis(client, headers, create_resume(user["id"]))
+    revision = client.post(f"/analyses/{analysis['id']}/revisions", headers=headers).json()
+
+    response = client.patch(
+        f"/revisions/{revision['id']}",
+        headers=headers,
+        json={"decisions": [{"index": 1, "accepted": True}]},
+    )
+
+    assert response.status_code == 200, response.text
+    # S=0.5 adds 10 points to both scores, so only the Docker edit moves the score.
+    assert response.json()["original_match_score"] == 53
+    assert response.json()["new_match_score"] == 70
+
+
+def test_rescore_returns_503_without_model(client):
+    use_llm(FakeLLM(JOB_JSON, SUGGESTIONS_JSON))
+    user = register(client)
+    headers = login(client)
+    analysis = create_job_analysis(client, headers, create_resume(user["id"]))
+    revision = client.post(f"/analyses/{analysis['id']}/revisions", headers=headers).json()
+    api.dependency_overrides[semantic_scorer.get_model] = lambda: None
+
+    response = client.patch(
+        f"/revisions/{revision['id']}",
+        headers=headers,
+        json={"decisions": [{"index": 1, "accepted": True}]},
+    )
+
+    assert response.status_code == 503
+    with psycopg.connect(TEST_DB) as conn:
+        saved = conn.execute(
+            "SELECT revised_text FROM revisions WHERE id = %s", (revision["id"],)
+        ).fetchone()
+    assert saved[0] is None

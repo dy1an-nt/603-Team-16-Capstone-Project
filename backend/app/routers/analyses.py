@@ -1,7 +1,7 @@
 """ATS scorer and job match: FR-9 to FR-13, FR-20."""
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,7 +15,7 @@ from app.repositories import (
 )
 from app.schemas import AnalysisCreate, AnalysisOut, JobRequirements, RevisionOut
 from app.security import CurrentUser, get_current_user
-from app.services import ats_scorer, llm, match_scorer, reviser
+from app.services import ats_scorer, llm, match_scorer, reviser, semantic_scorer
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ router = APIRouter(
 
 Db = Annotated[psycopg.Connection, Depends(get_db)]
 Llm = Annotated[llm.LLMClient, Depends(llm.get_llm_client)]
+SemanticModel = Annotated[Any | None, Depends(semantic_scorer.get_model)]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=AnalysisOut)
@@ -35,6 +36,7 @@ def create_analysis(
     user: CurrentUser,
     conn: Db,
     llm_client: Llm,
+    semantic_model: SemanticModel,
 ):
     # Retrieve the resume while enforcing ownership.
     resume = ResumeRepository(conn).get(user["id"], body.resume_id)
@@ -48,6 +50,11 @@ def create_analysis(
     # Extract job requirements before any write, so an LLM failure saves nothing.
     job = None
     if body.job_description is not None:
+        if semantic_model is None:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "Match scoring is unavailable. Try again later or run an ATS-only analysis.",
+            )
         try:
             job = llm.extract_job_requirements(llm_client, body.job_description)
         except llm.LLMError as exc:
@@ -72,7 +79,9 @@ def create_analysis(
         )
         if job_description_id is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Resume not found.")
-        match_score, report = match_scorer.score(resume["raw_text"], job)
+        match_score, report = match_scorer.score_with_model(
+            semantic_model, resume["raw_text"], job, body.job_description
+        )
         keywords = report.model_dump()
 
     repository = AnalysisRepository(conn)
@@ -100,8 +109,23 @@ def create_analysis(
 
 
 @router.get("/{analysis_id}", response_model=AnalysisOut)
-def get_analysis(analysis_id: int):
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "get not implemented")
+def get_analysis(
+    analysis_id: int,
+    user: CurrentUser,
+    conn: Db,
+):
+    analysis = AnalysisRepository(conn).get(
+        user["id"],
+        analysis_id,
+    )
+
+    if analysis is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Analysis not found.",
+        )
+
+    return analysis
 
 
 @router.post(
