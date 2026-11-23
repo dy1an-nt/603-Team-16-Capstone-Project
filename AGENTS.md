@@ -200,9 +200,15 @@ non-obvious pitfall, add one line here in the same pull request.
 - `frontend/js/api.js` hardcodes `API_BASE = "http://localhost:8000"`. The
   report's deploy plan changes it to a relative path. Do not add a second
   base URL anywhere.
-- `sentence-transformers` is commented out in `requirements.txt` until
-  Week 5. It is a large download. Load the model once at startup, never per
-  request.
+- `sentence-transformers` pulls in torch, a large download. The model loads
+  once at startup in the `main.py` lifespan, never per request. If it fails
+  to load, the app still starts, and job description analyses and match
+  re-scores return `502`. The lifespan only runs under
+  `with TestClient(app)`, so tests override `semantic_scorer.get_model`
+  instead.
+- MiniLM reads at most 256 tokens and drops the rest without an error.
+  `semantic_scorer` embeds text in `CHUNK_WORDS` chunks so a long resume is
+  read in full.
 - DOCX page count and rendered layout come from LibreOffice (`soffice`).
   It is best effort: if it is missing or fails, the upload still succeeds
   and `page_count` is `None`. Each run needs its own `-env:UserInstallation`

@@ -1,6 +1,6 @@
 """Reviser: FR-16, FR-17, FR-19."""
 
-from typing import Annotated
+from typing import Annotated, Any
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,7 +9,7 @@ from app.db import get_db
 from app.repositories import AnalysisRepository, ResumeRepository, RevisionRepository
 from app.schemas import ExportFormat, JobRequirements, RevisionOut, RevisionUpdate
 from app.security import CurrentUser, get_current_user
-from app.services import match_scorer, reviser
+from app.services import match_scorer, reviser, semantic_scorer
 
 # Every route here needs a logged-in user (NFR-8).
 router = APIRouter(
@@ -17,10 +17,17 @@ router = APIRouter(
 )
 
 Db = Annotated[psycopg.Connection, Depends(get_db)]
+SemanticModel = Annotated[Any | None, Depends(semantic_scorer.get_model)]
 
 
 @router.patch("/{revision_id}", response_model=RevisionOut)
-def update_revision(revision_id: int, body: RevisionUpdate, user: CurrentUser, conn: Db):
+def update_revision(
+    revision_id: int,
+    body: RevisionUpdate,
+    user: CurrentUser,
+    conn: Db,
+    semantic_model: SemanticModel,
+):
     repository = RevisionRepository(conn)
     revision = repository.get(user["id"], revision_id)
     if revision is None:
@@ -42,8 +49,15 @@ def update_revision(revision_id: int, body: RevisionUpdate, user: CurrentUser, c
     # Only the match score is re-scored (docs/api-contract.md assumptions).
     new_match_score = None
     if analysis["job_requirements"] is not None:
+        if semantic_model is None:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                "Match scoring is unavailable. Try again later.",
+            )
         job = JobRequirements.model_validate(analysis["job_requirements"])
-        new_match_score, _ = match_scorer.score(revised_text, job)
+        new_match_score, _ = match_scorer.score_with_model(
+            semantic_model, revised_text, job, analysis["job_text"]
+        )
 
     repository.update(user["id"], revision_id, suggestions, revised_text, new_match_score)
     return repository.get(user["id"], revision_id)

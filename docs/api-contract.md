@@ -70,7 +70,7 @@ The frontend should show `detail` when it is a string and the first item's
 | 413 | Upload larger than 5 MB |
 | 415 | Upload is not a PDF or DOCX |
 | 422 | Request body or query failed validation |
-| 502 | The LLM failed or returned invalid output after one retry (NFR-5). Returned by `POST /analyses` with a job description and by `POST /analyses/{id}/revisions`. Nothing is saved. |
+| 502 | The LLM failed or returned invalid output after one retry (NFR-5), or the semantic model is not loaded. Returned by `POST /analyses` with a job description, by `POST /analyses/{id}/revisions`, and by `PATCH /revisions/{id}` when it re-scores a match. Nothing is saved. |
 
 ### Conventions
 
@@ -278,8 +278,9 @@ If job description extraction fails after one retry, the request fails with
 ways on (NFR-4): retry, or run an ATS-only analysis by sending the same
 request without `job_description`.
 
-Errors: `502` LLM extraction failed, `404` resume not found, `422` missing
-`resume_id` or a blank `job_description`.
+Errors: `502` LLM extraction failed or the semantic model is not loaded,
+`404` resume not found, `422` missing `resume_id` or a blank
+`job_description`.
 
 ### GET /analyses/{id} (FR-20)
 
@@ -384,7 +385,8 @@ Content-Type: application/json
 ```
 
 Errors: `404` revision not found, `400` an `index` outside the suggestions
-list, `422` empty `decisions` or the same `index` listed twice.
+list, `422` empty `decisions` or the same `index` listed twice, `502` the
+semantic model is not loaded for a match re-score. Nothing is saved on `502`.
 
 ### GET /revisions/{id}/export (FR-19)
 
