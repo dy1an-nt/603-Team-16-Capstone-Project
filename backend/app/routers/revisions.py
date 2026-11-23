@@ -51,7 +51,7 @@ def update_revision(
     if analysis["job_requirements"] is not None:
         if semantic_model is None:
             raise HTTPException(
-                status.HTTP_503_SERVICE_UNAVAILABLE,
+                status.HTTP_502_BAD_GATEWAY,
                 "Match scoring is unavailable. Try again later.",
             )
         job = JobRequirements.model_validate(analysis["job_requirements"])

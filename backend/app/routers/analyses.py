@@ -52,7 +52,7 @@ def create_analysis(
     if body.job_description is not None:
         if semantic_model is None:
             raise HTTPException(
-                status.HTTP_503_SERVICE_UNAVAILABLE,
+                status.HTTP_502_BAD_GATEWAY,
                 "Match scoring is unavailable. Try again later or run an ATS-only analysis.",
             )
         try:

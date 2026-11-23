@@ -202,9 +202,10 @@ non-obvious pitfall, add one line here in the same pull request.
   base URL anywhere.
 - `sentence-transformers` pulls in torch, a large download. The model loads
   once at startup in the `main.py` lifespan, never per request. If it fails
-  to load, the app still starts and job description analyses return `503`.
-  The lifespan only runs under `with TestClient(app)`, so tests override
-  `semantic_scorer.get_model` instead.
+  to load, the app still starts, and job description analyses and match
+  re-scores return `502`. The lifespan only runs under
+  `with TestClient(app)`, so tests override `semantic_scorer.get_model`
+  instead.
 - MiniLM reads at most 256 tokens and drops the rest without an error.
   `semantic_scorer` embeds text in `CHUNK_WORDS` chunks so a long resume is
   read in full.

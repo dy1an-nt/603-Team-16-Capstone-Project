@@ -334,7 +334,7 @@ def test_job_description_analysis_adds_semantic_score(client, monkeypatch):
     assert response.json()["match_score"] == 53
 
 
-def test_job_description_analysis_returns_503_without_model(client):
+def test_job_description_analysis_returns_502_without_model(client):
     api.dependency_overrides[semantic_scorer.get_model] = lambda: None
     fake = use_llm(FakeLLM(JOB_JSON))
     user = register(client)
@@ -346,7 +346,7 @@ def test_job_description_analysis_returns_503_without_model(client):
         json={"resume_id": resume_id, "job_description": "Software Engineer. Python."},
     )
 
-    assert response.status_code == 503
+    assert response.status_code == 502
     assert "ATS-only" in response.json()["detail"]
     assert fake.calls == 0
     assert job_description_count() == 0
@@ -585,7 +585,7 @@ def test_rescore_includes_semantic_score(client, monkeypatch):
     assert response.json()["new_match_score"] == 70
 
 
-def test_rescore_returns_503_without_model(client):
+def test_rescore_returns_502_without_model(client):
     use_llm(FakeLLM(JOB_JSON, SUGGESTIONS_JSON))
     user = register(client)
     headers = login(client)
@@ -599,7 +599,7 @@ def test_rescore_returns_503_without_model(client):
         json={"decisions": [{"index": 1, "accepted": True}]},
     )
 
-    assert response.status_code == 503
+    assert response.status_code == 502
     with psycopg.connect(TEST_DB) as conn:
         saved = conn.execute(
             "SELECT revised_text FROM revisions WHERE id = %s", (revision["id"],)
