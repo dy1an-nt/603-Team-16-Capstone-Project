@@ -31,3 +31,17 @@ An implementing session does not sign off on its own work. Before pushing
 and opening the pull request, run `/code-review` on the branch and fix or
 answer each finding. A teammate's review on GitHub is still required to
 merge.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default roles: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
